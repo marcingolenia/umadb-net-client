@@ -1,0 +1,5 @@
+﻿<Solution>
+  <Project Path="Tests\Tests.fsproj" Type="Classic F#" />
+  <Project Path="UmaDb.Core\UmaDb.Core.fsproj" Type="Classic F#" />
+  <Project Path="UmaDb.FSharp\UmaDb.FSharp.fsproj" Type="Classic F#" />
+</Solution>

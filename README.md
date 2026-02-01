@@ -1,0 +1,89 @@
+# UmaDb .NET Client
+
+A high-performance, low-allocation .NET client for **UmaDB**, designed specifically for Dynamic Consistency Boundaries (DCB).
+
+## Architecture Decision Records (ADR)
+
+### ADR 1: Target Performance & Low Allocations
+
+* **Decision:** Use `ValueTask<T>` for the internal engine and gRPC transport via `protobuf-net.Grpc`.
+* **Rationale:** UmaDB handles high-frequency event streams. By using `ValueTask`, we achieve **zero-allocation** paths for synchronous completions (e.g., failed guard clauses or cache hits), reducing GC pressure in high-throughput systems.
+
+### ADR 2: Internal Use of IcedTasks
+
+* **Decision:** Utilize `IcedTasks.cancellableValueTask` for internal logic.
+* **Rationale:** * **Implicit Cancellation:** It allows internal functions to share a `CancellationToken` without polluting every private method signature.
+* **Cold Tasks:** It provides "cold" execution (like F# `Async`), making complex retry loops and DCB condition building safer to compose before execution.
+* **Performance:** It leverages F# 10's resumable code for struct-based state machines.
+
+
+
+### ADR 3: Triple-Surface API (The Language Bridge)
+
+* **Decision:** Expose different types for C# and F# through a Core library and an F# Wrapper.
+* **Rationale:**
+* **C# Surface (`Task<T>`):** Exposes `Task` and explicit `CancellationToken`. While the engine is `ValueTask`, `Task` is safer for C# users (prevents double-await bugs) and matches standard .NET idioms.
+* **F# Surface (`Async<T>`):** Provided via the `UmaDb.Client.FSharp` wrapper. It bridges the high-perf engine to the classic F# `async` block, enabling **implicit cancellation** flow.
+
+
+### ADR 4: Code-First Performance with protobuf-net
+
+* **Decision:** Use `protobuf-net.Grpc` for service definitions and serialization.
+* **Rationale:** * **Native F# Types:** Unlike standard gRPC (which relies on `protoc` code generation), `protobuf-net` allows us to use native F# records and types directly as data contracts. This eliminates the "Mapping Tax" (the CPU and memory overhead of converting generated DTOs into domain models).
+* **Low Allocation:** `protobuf-net` v3+ is optimized for modern .NET primitives like `ReadOnlySequence<byte>` and `IBufferWriter<byte>`, allowing it to serialize directly to network buffers with minimal intermediate heap allocations.
+
+
+---
+
+### Updated Architecture Summary
+
+By combining these tools, the library operates on a specialized "Zero-Copy" philosophy:
+
+1. **Transport:** `protobuf-net.Grpc` moves bytes without extra DTO mapping.
+2. **Concurrency:** `IcedTasks` manages logic without extra `Task` object overhead.
+3. **Boundary:** The **F# Wrapper** and **C# Surface** ensure the underlying performance is accessible in the most idiomatic way for each language.
+
+### Ready to start Phase 1?
+
+I can help you write the first piece of the puzzle: the **F# DataContracts** using `protobuf-net` attributes. This will define your `AppendRequest` and `StreamState` models in a way that’s ready for the gRPC engine.
+
+**Shall we start with the model definitions?**
+---
+
+## Library Structure
+
+| Layer | Technology | Primary Goal |
+| --- | --- | --- |
+| **Core Engine** | F# 10, IcedTasks | High-perf DCB logic, retry loops, and gRPC transport. |
+| **C# API** | .NET Standard / Task | Robustness, familiar "Hot Task" pattern, explicit CT. |
+| **F# Wrapper** | F# Async | Developer Ergonomics, "Cold" lazy execution, implicit CT. |
+
+---
+
+## Usage Examples
+
+### C# (Explicit & Familiar)
+TODO
+```csharp
+// Returns Task<T>, requires explicit CancellationToken
+var response = await client.AppendAsync(request, cancellationToken);
+
+```
+
+### F# (Idiomatic & Implicit)
+TODO
+```fsharp
+// Returns Async<T>, token is pulled from the ambient async context
+async {
+    let! response = client.Append(request)
+    return response
+}
+
+```
+
+---
+
+## Performance Notes
+
+* **Trimming:** Fully compatible with `.NET 10` trimming and AOT.
+* **Dependency:** `IcedTasks` is internalized; users of the library do not need to reference it.

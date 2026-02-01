@@ -1,0 +1,14 @@
+bin/
+obj/
+/packages/
+riderModule.iml
+/_ReSharper.Caches/
+.idea
+nuget
+*.user
+
+# Charity Portal
+CharityPortal/.tool-versions
+CharityPortal/tmp
+CharityPortal/.env
+CharityPortal/.env.*
