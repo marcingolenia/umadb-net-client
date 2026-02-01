@@ -9,4 +9,8 @@
     <ItemGroup>
       <ProjectReference Include="..\UmaDb.Core\UmaDb.Core.fsproj" />
     </ItemGroup>
+    <ItemGroup>
+      <PackageReference Include="Grpc.Net.Client" />
+      <PackageReference Include="Protobuf.Grpc.ClientFactory" />
+    </ItemGroup>
 </Project>

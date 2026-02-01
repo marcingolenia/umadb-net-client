@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
         <RootNamespace>Client</RootNamespace>
@@ -9,8 +9,11 @@
         <Compile Include="Program.fs"/>
     </ItemGroup>
     <ItemGroup>
+        <PackageReference Include="Grpc.Net.Client" />
         <PackageReference Include="protobuf-net" />
         <PackageReference Include="protobuf-net.Grpc" />
+        <PackageReference Include="Protobuf.Grpc.ClientFactory" />
+        <PackageReference Include="System.Security.Cryptography.Pkcs" />
         <PackageReference Include="System.ServiceModel.Primitives" />
     </ItemGroup>
 </Project>
