@@ -8,7 +8,7 @@ open UmaDb.Core
 open Xunit
 
 [<Fact>]
-let ``Can connect and append event`` () =
+let ``Can connect and append event using raw GrpcChannel`` () =
     task {
         AppContext.SetSwitch("System.Net.Http.SocketsHttpHandler.Http2UnencryptedSupport", true)
         use channel = GrpcChannel.ForAddress("http://localhost:50051")

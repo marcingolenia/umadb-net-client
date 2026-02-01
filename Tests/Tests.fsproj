@@ -4,12 +4,15 @@
         <IsPackable>false</IsPackable>
     </PropertyGroup>
     <ItemGroup>
+        <Compile Include="Setup.fs" />
         <Compile Include="SimpleConnectivity.fs" />
+        <Compile Include="TlsConnectivity.fs" />
     </ItemGroup>
     <ItemGroup>
         <PackageReference Include="FsUnit.xUnit" />
         <PackageReference Include="Grpc.Net.Client" />
         <PackageReference Include="Protobuf.Grpc.ClientFactory" />
+        <PackageReference Include="Testcontainers" />
         <PackageReference Include="xunit.runner.visualstudio" />
         <PackageReference Include="xunit.v3" />
         <PackageReference Include="Microsoft.NET.Test.Sdk" />
