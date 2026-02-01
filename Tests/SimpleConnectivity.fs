@@ -26,3 +26,4 @@ let ``Can connect and append event using raw GrpcChannel`` () =
         let! response = client.Append(request, ProtoBuf.Grpc.CallContext.Default)
         response.Position |> should be (greaterThan 0UL)
     }
+
