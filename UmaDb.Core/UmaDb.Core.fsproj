@@ -9,6 +9,7 @@
         <Compile Include="Program.fs"/>
         <Compile Include="UmaConnection.fs" />
         <Compile Include="UmaClient.fs" />
+        <Compile Include="DiExtensions.fs" />
     </ItemGroup>
     <ItemGroup>
         <PackageReference Include="Grpc.Net.Client" />
@@ -17,5 +18,9 @@
         <PackageReference Include="Protobuf.Grpc.ClientFactory" />
         <PackageReference Include="System.Security.Cryptography.Pkcs" />
         <PackageReference Include="System.ServiceModel.Primitives" />
+        <PackageReference Include="Microsoft.Extensions.Configuration" />
+        <PackageReference Include="Microsoft.Extensions.Configuration.Binder" />
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
     </ItemGroup>
 </Project>

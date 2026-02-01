@@ -62,7 +62,12 @@ module UmaConnection =
             match certPath with
             | Some _ -> $"https://{host}:{port}"
             | None -> $"http://{host}:{port}"
-        let handler = new SocketsHttpHandler()
+        let handler = new SocketsHttpHandler(
+            // Prevents "Stuck" connections if the network drops
+            PooledConnectionIdleTimeout = TimeSpan.FromMinutes(2.0),
+            //  Allows the client to open new sockets if the current HTTP/2 stream limit is reached (usually 100).
+            EnableMultipleHttp2Connections = true 
+        )
         let certToDispose =
             match certPath with
             | Some path ->
