@@ -6,6 +6,7 @@ open System.Runtime.InteropServices
 open System.Threading
 open System.Threading.Tasks
 open Client.UmaConnection
+open FSharp.Control
 open ProtoBuf.Grpc.Client
 open UmaDb.Core
 open ProtoBuf.Grpc
@@ -13,19 +14,33 @@ open ProtoBuf.Grpc
 type UmaClient (connection: UmaConnectionResult) =
     let service = connection.GetCallInvoker().CreateGrpcService<IDcbService>()
 
-    member _.AppendAsync(request: AppendRequest, [<Optional>] ?ct: CancellationToken) : ValueTask<AppendResponse> =
-        let ct = defaultArg ct CancellationToken.None
+    member _.AppendAsync(request: AppendRequest) : ValueTask<AppendResponse> =
+        service.Append(request, CallContext.op_Implicit CancellationToken.None)
+
+    member _.AppendAsync(request: AppendRequest, ct: CancellationToken) : ValueTask<AppendResponse> =
         // F# compiler chose the wrong constructor overload (CallContext(opts)), skip the drama by using the implicit operator.
         service.Append(request, CallContext.op_Implicit ct)
 
-    member _.GetHeadAsync([<Optional>] ?ct: CancellationToken) : ValueTask<HeadResponse> =
-        let ct = defaultArg ct CancellationToken.None
+    member _.GetHeadAsync() : ValueTask<HeadResponse> =
+        service.Head({ _unused = Nullable() }, CallContext.op_Implicit CancellationToken.None)
+
+    member _.GetHeadAsync(ct: CancellationToken) : ValueTask<HeadResponse> =
         service.Head({ _unused = Nullable() }, CallContext.op_Implicit ct)
 
-    member _.ReadAsync(request: ReadRequest, [<Optional>] ?ct: CancellationToken) : IAsyncEnumerable<ReadResponse> =
-        let ct = defaultArg ct CancellationToken.None
+    member _.ReadAsync(request: ReadRequest, ct: CancellationToken) : IAsyncEnumerable<ReadResponse> =
         service.Read(request, CallContext.op_Implicit ct)
+        
+    member this.ReadListAsync(request: ReadRequest) : Task<List<SequencedEvent>> =
+        task {
+                let results = List<SequencedEvent>()
+                do! this.ReadAsync(request, CancellationToken.None)
+                    |> TaskSeq.collectSeq _.Events
+                    |> TaskSeq.iter results.Add       
+                return results
+            }
 
+    member _.ReadAsync(request: ReadRequest) : IAsyncEnumerable<ReadResponse> =
+        service.Read(request, CallContext.op_Implicit CancellationToken.None)
 
     interface IDisposable with
         member _.Dispose() = (connection :> IDisposable).Dispose()

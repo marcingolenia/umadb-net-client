@@ -19,7 +19,7 @@ let ``Can connect and append event using raw GrpcChannel`` () =
             Data = System.Text.Encoding.UTF8.GetBytes("Hello UmaDB")
             Uuid = Guid.NewGuid().ToString()
         }
-        let request = {
+        let request: AppendRequest = {
             Events = ResizeArray([ event ])
             Condition = None
         }

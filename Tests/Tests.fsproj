@@ -4,6 +4,7 @@
         <IsPackable>false</IsPackable>
     </PropertyGroup>
     <ItemGroup>
+        <Compile Include="Operations.fs" />
         <Compile Include="Setup.fs" />
         <Compile Include="SimpleConnectivity.fs" />
         <Compile Include="SocketExhautions.fs" />

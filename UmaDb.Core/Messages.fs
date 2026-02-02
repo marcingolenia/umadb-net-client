@@ -32,11 +32,11 @@ type AppendCondition =
 [<ProtoContract; CLIMutable>]
 type ReadRequest =
     { [<ProtoMember(1)>] Query: Query option
-      [<ProtoMember(2)>] Start: Nullable<uint64>
-      [<ProtoMember(3)>] Backwards: Nullable<bool>
-      [<ProtoMember(4)>] Limit: Nullable<uint32>
-      [<ProtoMember(5)>] Subscribe: Nullable<bool>
-      [<ProtoMember(6)>] BatchSize: Nullable<uint32> }
+      [<ProtoMember(2)>] Start: uint64 option
+      [<ProtoMember(3)>] Backwards: bool
+      [<ProtoMember(4)>] Limit: uint32 option
+      [<ProtoMember(5)>] Subscribe: bool
+      [<ProtoMember(6)>] BatchSize: uint32 option }
 
 [<ProtoContract; CLIMutable>]
 type ReadResponse =

@@ -8,7 +8,6 @@
         <Compile Include="DcbService.fs"/>
         <Compile Include="UmaConnection.fs" />
         <Compile Include="UmaClient.fs" />
-        <Compile Include="DiExtensions.fs" />
     </ItemGroup>
     <ItemGroup>
         <PackageReference Include="Grpc.Net.Client" />
@@ -21,5 +20,6 @@
         <PackageReference Include="Microsoft.Extensions.Configuration.Binder" />
         <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
         <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+        <PackageReference Include="FSharp.Control.TaskSeq"/>
     </ItemGroup>
 </Project>
