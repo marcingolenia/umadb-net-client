@@ -10,9 +10,9 @@ let ``Stress Test: High concurrency should not leak sockets`` () =
     let iterations = 1000
 
     async {
-        use client = UmaClient.Connect("localhost", 15001)
+        use client = UmaClient.Connect("localhost", 50051)
 
-        let getHeadAsync _ = client.GetHeadAsync() |> Async.AwaitTask
+        let getHeadAsync _ = client.GetHeadAsync().AsTask() |> Async.AwaitTask
 
         let! results =
             List.init iterations id

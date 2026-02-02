@@ -1,11 +1,11 @@
 module Client.UmaClient
 
 open System
+open System.Collections.Generic
 open System.Runtime.InteropServices
 open System.Threading
 open System.Threading.Tasks
 open Client.UmaConnection
-open Grpc.Core
 open ProtoBuf.Grpc.Client
 open UmaDb.Core
 open ProtoBuf.Grpc
@@ -13,25 +13,19 @@ open ProtoBuf.Grpc
 type UmaClient (connection: UmaConnectionResult) =
     let service = connection.GetCallInvoker().CreateGrpcService<IDcbService>()
 
-    let withContext ct =
-        let opts = CallOptions(cancellationToken = ct)
-        if ct = CancellationToken.None then CallContext.Default else CallContext(&opts)
+    member _.AppendAsync(request: AppendRequest, [<Optional>] ?ct: CancellationToken) : ValueTask<AppendResponse> =
+        let ct = defaultArg ct CancellationToken.None
+        // F# compiler chose the wrong constructor overload (CallContext(opts)), skip the drama by using the implicit operator.
+        service.Append(request, CallContext.op_Implicit ct)
 
-    member _.AppendAsync(request: AppendRequest) : Task<AppendResponse> =
-        let ctx = withContext CancellationToken.None
-        service.Append(request, ctx).AsTask()
+    member _.GetHeadAsync([<Optional>] ?ct: CancellationToken) : ValueTask<HeadResponse> =
+        let ct = defaultArg ct CancellationToken.None
+        service.Head({ _unused = Nullable() }, CallContext.op_Implicit ct)
 
-    member _.AppendAsync(request: AppendRequest, ct: CancellationToken) : Task<AppendResponse> =
-        let ctx = withContext ct
-        service.Append(request, ctx).AsTask()
+    member _.ReadAsync(request: ReadRequest, [<Optional>] ?ct: CancellationToken) : IAsyncEnumerable<ReadResponse> =
+        let ct = defaultArg ct CancellationToken.None
+        service.Read(request, CallContext.op_Implicit ct)
 
-    member _.GetHeadAsync() : Task<HeadResponse> =
-        let ctx = withContext CancellationToken.None
-        service.Head({ _unused = Nullable() }, ctx).AsTask()
-
-    member _.GetHeadAsync(ct: CancellationToken) : Task<HeadResponse> =
-        let ctx = withContext ct
-        service.Head({ _unused = Nullable() }, ctx).AsTask()
 
     interface IDisposable with
         member _.Dispose() = (connection :> IDisposable).Dispose()
