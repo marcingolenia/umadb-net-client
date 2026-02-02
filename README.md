@@ -81,6 +81,25 @@ async {
 
 ```
 
+Use this version in your README:
+
+---
+
+# Managing UmaClient in your codebase
+
+**Source:** [Performance best practices with gRPC | Microsoft Learn](https://learn.microsoft.com/en-us/aspnet/core/grpc/performance?view=aspnetcore-8.0)
+
+- **Reuse channels:** *"A gRPC channel should be reused when making gRPC calls. Reusing a channel allows calls to be multiplexed through an existing HTTP/2 connection."*
+
+- **Cost of creating a new channel per call:** *"If a new channel is created for each gRPC call then the amount of time it takes to complete can increase significantly. Each call will require multiple network round-trips between the client and the server to create a new HTTP/2 connection: 1. Opening a socket 2. Establishing TCP connection 3. Negotiating TLS 4. Starting HTTP/2 connection 5. Making the gRPC call."*
+
+- **Sharing and concurrency:** *"Channels are safe to share and reuse between gRPC calls."* *"A channel and clients created from the channel can safely be used by multiple threads."* *"Clients created from the channel can make multiple simultaneous calls."*
+
+**Recommendations:**
+
+- **C#:** Register `UmaClient` as a **singleton** in your DI container (e.g. with `AddUmaDbClient` from this library). Resolve it where needed; the host will dispose it on shutdown.
+- **F#:** Create **one** `UmaClient` at application startup (e.g. in `main` with `use client = UmaClient.Connect(...)`) and **pass it as an argument** to the functions that need it. Dispose only at process exit.
+
 ---
 
 ## Performance Notes

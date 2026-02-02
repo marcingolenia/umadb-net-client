@@ -1,6 +1,5 @@
 module Client.UmaClient
 
-
 open System
 open System.Runtime.InteropServices
 open System.Threading

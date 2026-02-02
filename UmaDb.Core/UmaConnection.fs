@@ -53,13 +53,11 @@ module UmaConnection =
     let create (host: string) (port: int) (caCertPath: string option) (apiKey: string option) : UmaConnectionResult =
         if not (nonEmpty host) then invalidArg "host" "Host cannot be empty."
         if not (validPort port) then invalidArg "port" "Port must be between 1 and 65535."
-        let certPath = caCertPath |> Option.filter nonEmpty
-        let keyOpt = apiKey |> Option.filter nonEmpty
-        match keyOpt, certPath with
+        match apiKey, caCertPath with
         | Some _, None -> invalidArg "apiKey" "Security Risk: API Key cannot be sent over unencrypted connections (missing CA Cert)."
         | _ -> ()
         let address =
-            match certPath with
+            match caCertPath with
             | Some _ -> $"https://{host}:{port}"
             | None -> $"http://{host}:{port}"
         let handler = new SocketsHttpHandler(
@@ -69,7 +67,7 @@ module UmaConnection =
             EnableMultipleHttp2Connections = true 
         )
         let certToDispose =
-            match certPath with
+            match caCertPath with
             | Some path ->
                 let caCert = X509CertificateLoader.LoadCertificateFromFile(path)
                 handler.SslOptions <- SslClientAuthenticationOptions(
@@ -80,4 +78,4 @@ module UmaConnection =
                 None
         let options = GrpcChannelOptions(HttpHandler = handler, DisposeHttpClient = true)
         let channel = GrpcChannel.ForAddress(address, options)
-        new UmaConnectionResult(channel, certToDispose, keyOpt)
+        new UmaConnectionResult(channel, certToDispose, apiKey)

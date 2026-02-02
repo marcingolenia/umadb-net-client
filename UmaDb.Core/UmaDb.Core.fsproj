@@ -6,7 +6,6 @@
     <ItemGroup>
         <Compile Include="Messages.fs"/>
         <Compile Include="DcbService.fs"/>
-        <Compile Include="Program.fs"/>
         <Compile Include="UmaConnection.fs" />
         <Compile Include="UmaClient.fs" />
         <Compile Include="DiExtensions.fs" />
