@@ -28,14 +28,35 @@ type UmaClient (connection: UmaConnectionResult) =
         service.Head({ _unused = Nullable() }, CallContext.op_Implicit ct)
 
     member _.ReadAsync(request: ReadRequest, ct: CancellationToken) : IAsyncEnumerable<ReadResponse> =
-        service.Read(request, CallContext.op_Implicit ct)
+        let requestWithBatch =
+            if request.BatchSize.IsNone then
+                { request with BatchSize = Some 256u }
+            else
+                request
+        service.Read(requestWithBatch, CallContext.op_Implicit ct)
         
     member this.ReadListAsync(request: ReadRequest) : Task<List<SequencedEvent>> =
         task {
                 let results = List<SequencedEvent>()
-                do! this.ReadAsync(request, CancellationToken.None)
-                    |> TaskSeq.collectSeq _.Events
-                    |> TaskSeq.iter results.Add       
+                let req =
+                    if request.BatchSize.IsNone then
+                        { request with BatchSize = Some 256u }
+                    else
+                        request
+                let enumerable = this.ReadAsync(req, CancellationToken.None)
+                let enumerator = enumerable.GetAsyncEnumerator(CancellationToken.None)
+                try
+                    let mutable hasMore = true
+                    while hasMore do
+                        let! hasValue = enumerator.MoveNextAsync()
+                        hasMore <- hasValue
+                        if hasMore then
+                            let response = enumerator.Current
+                            if not (isNull response.Events) then
+                                results.AddRange(response.Events)
+                finally
+                    let! _ = enumerator.DisposeAsync().AsTask()
+                    ()
                 return results
             }
 
