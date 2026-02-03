@@ -1,6 +1,7 @@
 module Operations
 
 open System
+open System.Threading.Tasks
 open FsUnit.Xunit
 open UmaDb.Core
 open Xunit
@@ -14,7 +15,7 @@ let event =
 
 let appendRequest =
     { Events = ResizeArray([ event ])
-      Condition = None }
+      Condition = Nullable.appendCondition }
 
 [<Fact>]
 let ``Can write and read`` () =
@@ -22,21 +23,21 @@ let ``Can write and read`` () =
         use client = UmaClient.Connect("localhost", 50051)
         let! writeReponse = client.AppendAsync(appendRequest)
 
+        let query =
+            { Items =
+                [ { Types = [ "TestEvent" ] |> ResizeArray
+                    Tags = [ "operations" ] |> ResizeArray } ]
+                |> ResizeArray }
         let readRequest: ReadRequest =
-            { Query =
-                Some
-                    { Items =
-                        [ { Tags = [ "operations" ] |> ResizeArray
-                            Types = [ "TestEvent" ] |> ResizeArray } ]
-                        |> ResizeArray }
-              Start = None
+            { Query = query
+              Start = Nullable 1UL
               Backwards = false
-              Limit = None
+              Limit = Nullable()
               Subscribe = false
-              BatchSize = None }
+              BatchSize = Nullable() }
 
         let! events = client.ReadListAsync(readRequest)
 
-
+        events.Count |> should be (greaterThan 0)
         writeReponse.Position |> should be (greaterThan 0UL)
     }

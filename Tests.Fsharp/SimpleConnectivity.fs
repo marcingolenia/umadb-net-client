@@ -1,4 +1,4 @@
-﻿module SimpleConnectivity
+module SimpleConnectivity
 
 open System
 open Grpc.Net.Client
@@ -21,7 +21,7 @@ let ``Can connect and append event using raw GrpcChannel`` () =
         }
         let request: AppendRequest = {
             Events = ResizeArray([ event ])
-            Condition = None
+            Condition = Nullable.appendCondition
         }
         let! response = client.Append(request, ProtoBuf.Grpc.CallContext.Default)
         response.Position |> should be (greaterThan 0UL)

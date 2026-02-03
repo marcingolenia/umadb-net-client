@@ -65,12 +65,38 @@ public sealed class UmaClient(UmaConnection.UmaConnectionResult connection) : ID
 
         return results;
     }
+    
+    public IAsyncEnumerable<UmaReadBatch> ReadAllAsync(
+        int? start = null,
+        int? limit = null,
+        bool backwards = false,
+        bool subscribe = false,
+        CancellationToken ct = default)
+    {
+        return _service.Read(new ReadRequest
+        {
+            Query = null,
+            Start = start.HasValue ? (ulong)start.Value : null,
+            Backwards = backwards,
+            Limit = limit.HasValue ? (uint)limit.Value : null,
+            Subscribe = subscribe
+        }, ct).Select(response => new UmaReadBatch(
+            (response.Events ?? []).Select(e => new SequencedUmaEvent(
+                (long)e.Position,
+                new UmaEvent(
+                    e.Event.EventType,
+                    e.Event.Data.ToArray(),
+                    e.Event.Tags?.ToArray(),
+                    string.IsNullOrEmpty(e.Event.Uuid) ? null : Guid.TryParse(e.Event.Uuid, out var guid) ? guid : null))).ToList(),
+            response.Head.HasValue ? (long)response.Head.Value : null));
+    }
 
     /// <summary>
     ///     Overload to Read using the fluent UmaQuery directly.
     ///     The query can include filter criteria (via <see cref="UmaQuery.Where" /> and <see cref="UmaQuery.Or" />)
     ///     as well as read options (via <see cref="UmaQuery.ReadBackwards" />, <see cref="UmaQuery.FromPosition" />,
     ///     <see cref="UmaQuery.Take" />, and <see cref="UmaQuery.SubscribeToUpdates" />).
+    ///     UmaDB uses 1-based positions; use <see cref="UmaQuery.FromPosition" />(1) to read from the first event when filtering.
     /// </summary>
     public IAsyncEnumerable<UmaReadBatch> ReadAsync(
         UmaQuery query,
@@ -79,10 +105,9 @@ public sealed class UmaClient(UmaConnection.UmaConnectionResult connection) : ID
         return _service.Read(new ReadRequest
         {
             Query = query.ToProto(),
-            Start =
-                query.Start.HasValue ? FSharpOption<ulong>.Some((ulong)query.Start.Value) : FSharpOption<ulong>.None,
+            Start = query.Start.HasValue ? (ulong)query.Start.Value : null,
             Backwards = query.Backwards,
-            Limit = query.Limit.HasValue ? FSharpOption<uint>.Some((uint)query.Limit.Value) : FSharpOption<uint>.None,
+            Limit = query.Limit.HasValue ? (uint)query.Limit.Value : null,
             Subscribe = query.Subscribe
         }, ct).Select(response => new UmaReadBatch(
             (response.Events ?? []).Select(e => new SequencedUmaEvent(
@@ -107,20 +132,20 @@ public sealed class UmaClient(UmaConnection.UmaConnectionResult connection) : ID
     {
         var request = new AppendRequest
         {
-            Events = events.Select(e => new Event
+            Events = [.. events.Select(e => new Event
             {
                 EventType = e.EventType,
                 Tags = e.Tags?.ToList() ?? [],
                 Data = e.Data.ToArray(),
                 Uuid = (e.Id ?? Guid.NewGuid()).ToString()
-            }).ToList(),
+            })],
             Condition = failIfMatch != null
-                ? FSharpOption<AppendCondition>.Some(new AppendCondition
+                ? new AppendCondition
                 {
                     FailIfEventsMatch = failIfMatch.ToProto(),
                     After = after.HasValue ? (ulong?)after.Value : null
-                })
-                : FSharpOption<AppendCondition>.None
+                }
+                : null
         };
 
         return _service.Append(request, ct);

@@ -28,7 +28,7 @@ public class Examples
     public async Task append_and_read_events()
     {
         using var umaClient = UmaClient.Connect("localhost", 50051);
-        var orderCreated = new OrderCreated(Guid.NewGuid(), 100m);
+        var orderCreated = new OrderCreated(Guid.NewGuid(), 100.32m);
         var orderShipped = new OrderShipped(Guid.NewGuid(), "123 Main St");
         var evt1 = new UmaEvent(
             nameof(OrderCreated),
@@ -44,6 +44,28 @@ public class Examples
         await umaClient.AppendAsync([evt1, evt2]);
         var query = UmaQuery.Where(types: [nameof(OrderCreated)], tags: [$"order-{orderCreated.OrderId}"]);
         var events = await umaClient.ReadListAsync(query);
+        var payload = JsonSerializer.Deserialize<OrderCreated>(events[0].Event.Data.ToArray());
         Assert.Single(events);
+        Assert.Equal(orderCreated, payload);
+    }
+
+    [Fact]
+    public async Task can_read_all_events()
+    {
+        using var umaClient = UmaClient.Connect("localhost", 50051);
+        var orderCreated = new OrderCreated(Guid.NewGuid(), 100m);
+        var evt1 = new UmaEvent(
+            nameof(OrderCreated),
+            JsonSerializer.SerializeToUtf8Bytes(orderCreated),
+            [$"order-{orderCreated.OrderId}"]
+        );
+        await umaClient.AppendAsync([evt1]);
+        var events = umaClient.ReadAllAsync();
+        List<UmaReadBatch> batches = [];
+        await foreach (var batch in events)
+        {
+            batches.Add(batch);
+        }
+        Assert.True( batches.Count > 0);
     }
 }

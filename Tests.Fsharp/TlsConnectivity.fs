@@ -14,7 +14,7 @@ let private appendRequest  =
           Data = System.Text.Encoding.UTF8.GetBytes("Hello UmaDB")
           Uuid = Guid.NewGuid().ToString() }
     { Events = ResizeArray([ event ])
-      Condition = None }
+      Condition = Nullable.appendCondition }
 
 [<Fact>]
 let ``API key without CA cert is rejected`` () =

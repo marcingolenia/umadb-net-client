@@ -26,17 +26,17 @@ type Query =
 
 [<ProtoContract; CLIMutable>]
 type AppendCondition =
-    { [<ProtoMember(1)>] FailIfEventsMatch: Query option
+    { [<ProtoMember(1)>] FailIfEventsMatch: Query
       [<ProtoMember(2)>] After: Nullable<uint64> }
 
 [<ProtoContract; CLIMutable>]
 type ReadRequest =
-    { [<ProtoMember(1)>] Query: Query option
-      [<ProtoMember(2)>] Start: uint64 option
+    { [<ProtoMember(1)>] Query: Query
+      [<ProtoMember(2)>] Start: Nullable<uint64>
       [<ProtoMember(3)>] Backwards: bool
-      [<ProtoMember(4)>] Limit: uint32 option
+      [<ProtoMember(4)>] Limit: Nullable<uint32>
       [<ProtoMember(5)>] Subscribe: bool
-      [<ProtoMember(6)>] BatchSize: uint32 option }
+      [<ProtoMember(6)>] BatchSize: Nullable<uint32> }
 
 [<ProtoContract; CLIMutable>]
 type ReadResponse =
@@ -46,7 +46,13 @@ type ReadResponse =
 [<ProtoContract; CLIMutable>]
 type AppendRequest =
     { [<ProtoMember(1)>] Events: ResizeArray<Event>
-      [<ProtoMember(2)>] Condition: AppendCondition option }
+      [<ProtoMember(2)>] Condition: AppendCondition }
+
+/// Nullable (null) values for optional message types. Use when a Condition or Query is not present.
+/// F# records cannot use the null literal; these values serialize as absent in protobuf.
+module Nullable =
+    let appendCondition: AppendCondition = Unchecked.defaultof<AppendCondition>
+    let query: Query = Unchecked.defaultof<Query>
 
 [<ProtoContract; CLIMutable>]
 type AppendResponse =
