@@ -15,3 +15,6 @@ type IDcbService =
 
     [<OperationContract>]
     abstract Head : HeadRequest * CallContext -> ValueTask<HeadResponse>
+
+    [<OperationContract>]
+    abstract GetTrackingInfo : TrackingRequest * CallContext -> ValueTask<TrackingResponse>

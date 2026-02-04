@@ -2,23 +2,22 @@ using UmaDb.Core;
 
 namespace UmaDb.Csharp;
 
-public class UmaQuery
+public class UmaFilter
 {
-    private List<UmaQueryItem> Items { get; } = [];
-    public bool Backwards { get; private set; }
-    public long? Start { get; private set; }
-    public int? Limit { get; private set; }
-    public bool Subscribe { get; private set; }
-
-    public static UmaQuery Where(string[]? types = null, string[]? tags = null)
+    internal UmaFilter()
     {
-        var query = new UmaQuery();
-        return query.Or(types, tags);
     }
-    
-    public UmaQuery Or(string[]? types = null, string[]? tags = null)
+
+    internal List<QueryItem> Items { get; } = [];
+
+    public static UmaFilter All => new();
+
+    public static UmaFilter Where(string[]? types = null, string[]? tags = null) => 
+        new UmaFilter().Or(types, tags);
+
+    public UmaFilter Or(string[]? types = null, string[]? tags = null)
     {
-        Items.Add(new UmaQueryItem
+        Items.Add(new QueryItem
         {
             Types = types?.ToList() ?? [],
             Tags = tags?.ToList() ?? []
@@ -26,45 +25,31 @@ public class UmaQuery
         return this;
     }
 
-    public UmaQuery ReadBackwards(bool backwards = true)
+
+    public UmaQuery WithOptions(Action<UmaQueryOptions>? configure = null)
     {
-        Backwards = backwards;
-        return this;
+        var options = new UmaQueryOptions();
+        configure?.Invoke(options);
+        return new UmaQuery(this, options);
     }
 
-    public UmaQuery FromPosition(long? start)
+    internal Query? ToProto()
     {
-        Start = start;
-        return this;
-    }
-
-    public UmaQuery Take(int? limit)
-    {
-        Limit = limit;
-        return this;
-    }
-
-    public UmaQuery SubscribeToUpdates(bool subscribe = true)
-    {
-        Subscribe = subscribe;
-        return this;
-    }
-
-    internal Query ToProto()
-    {
-        return new Query
-            {
-                Items = Items.Select(i => new QueryItem
-                {
-                    Types = i.Types,
-                    Tags = i.Tags
-                }).ToList()
-            };
+        return Items.Count == 0 ? null : new Query { Items = Items };
     }
 }
 
-public class UmaQueryItem
+public class UmaQueryOptions
 {
-    public List<string> Types { get; init; } = [];
-    public List<string> Tags { get; init; } = [];
+    public long? FromPosition { get; set; }
+    public int? Limit { get; set; }
+    public int? BatchSize { get; set; }
+    public bool Backwards { get; set; }
+    public bool Subscribe { get; set; }
+}
+
+public class UmaQuery(UmaFilter filter, UmaQueryOptions options)
+{
+    public UmaFilter Filter { get; } = filter;
+    public UmaQueryOptions Options { get; } = options;
 }

@@ -44,15 +44,22 @@ type ReadResponse =
       [<ProtoMember(2)>] Head: Nullable<uint64> }
 
 [<ProtoContract; CLIMutable>]
+type TrackingInfo =
+    { [<ProtoMember(1)>] Source: string
+      [<ProtoMember(2)>] Position: uint64 }
+
+[<ProtoContract; CLIMutable>]
 type AppendRequest =
     { [<ProtoMember(1)>] Events: ResizeArray<Event>
-      [<ProtoMember(2)>] Condition: AppendCondition }
+      [<ProtoMember(2)>] Condition: AppendCondition
+      [<ProtoMember(3)>] TrackingInfo: TrackingInfo }
 
 /// Nullable (null) values for optional message types. Use when a Condition or Query is not present.
 /// F# records cannot use the null literal; these values serialize as absent in protobuf.
 module Nullable =
     let appendCondition: AppendCondition = Unchecked.defaultof<AppendCondition>
     let query: Query = Unchecked.defaultof<Query>
+    let trackingInfo: TrackingInfo = Unchecked.defaultof<TrackingInfo>
 
 [<ProtoContract; CLIMutable>]
 type AppendResponse =
@@ -64,6 +71,14 @@ type HeadRequest =
 
 [<ProtoContract; CLIMutable>]
 type HeadResponse =
+    { [<ProtoMember(1)>] Position: Nullable<uint64> }
+
+[<ProtoContract; CLIMutable>]
+type TrackingRequest =
+    { [<ProtoMember(1)>] Source: string }
+
+[<ProtoContract; CLIMutable>]
+type TrackingResponse =
     { [<ProtoMember(1)>] Position: Nullable<uint64> }
 
 [<ProtoContract>]

@@ -1,7 +1,6 @@
 module Operations
 
 open System
-open System.Threading.Tasks
 open FsUnit.Xunit
 open UmaDb.Core
 open Xunit
@@ -15,7 +14,8 @@ let event =
 
 let appendRequest =
     { Events = ResizeArray([ event ])
-      Condition = Nullable.appendCondition }
+      Condition = Nullable.appendCondition
+      TrackingInfo = Nullable.trackingInfo }
 
 [<Fact>]
 let ``Can write and read`` () =
