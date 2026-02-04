@@ -36,18 +36,26 @@ type UmaConnectionResult internal (channel: GrpcChannel, certToDispose: X509Cert
 
 and private AuthInterceptor(apiKey: string) =
     inherit Interceptor()
-    let addHeader (ctx: ClientInterceptorContext<_, _>) = ctx.Options.Headers.Add("x-api-key", apiKey)
-    let withHeader context f = addHeader context; f ()
+    let contextWithHeader (ctx: ClientInterceptorContext<'a, 'b>) : ClientInterceptorContext<'a, 'b> =
+        let headers = if isNull ctx.Options.Headers then Metadata() else ctx.Options.Headers
+        headers.Add("authorization", "Bearer " + apiKey);
+        let options = ctx.Options.WithHeaders(headers)
+        ClientInterceptorContext(ctx.Method, ctx.Host, options)
     override _.AsyncUnaryCall(request, context, continuation) =
-        withHeader context (fun () -> continuation.Invoke(request, context))
+        let ctx = contextWithHeader context
+        continuation.Invoke(request, ctx)
     override _.AsyncServerStreamingCall(request, context, continuation) =
-        withHeader context (fun () -> continuation.Invoke(request, context))
+        let ctx = contextWithHeader context
+        continuation.Invoke(request, ctx)
     override _.AsyncClientStreamingCall(context, continuation) =
-        withHeader context (fun () -> continuation.Invoke(context))
+        let ctx = contextWithHeader context
+        continuation.Invoke(ctx)
     override _.AsyncDuplexStreamingCall(context, continuation) =
-        withHeader context (fun () -> continuation.Invoke(context))
+        let ctx = contextWithHeader context
+        continuation.Invoke(ctx)
     override _.BlockingUnaryCall(request, context, continuation) =
-        withHeader context (fun () -> continuation.Invoke(request, context))
+        let ctx = contextWithHeader context
+        continuation.Invoke(request, ctx)
 
 module UmaConnection =
     let create (host: string) (port: int) (caCertPath: string option) (apiKey: string option) : UmaConnectionResult =
