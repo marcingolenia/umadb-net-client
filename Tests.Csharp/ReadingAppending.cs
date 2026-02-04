@@ -10,26 +10,8 @@ public record OrderCreated(Guid OrderId, decimal Amount);
 
 public record OrderShipped(Guid OrderId, string Address);
 
-public class Examples
+public class ReadingAppending
 {
-    [Fact]
-    public void can_create_uma_client()
-    {
-        using var umaClient = UmaClient.Connect("localhost", 50051);
-    }
-    
-    [Fact(Skip = "Requires a key.pem file")]
-    public void can_create_uma_client_with_tls()
-    {
-        using var umaClient = UmaClient.Connect("localhost", 50051, "~/code/key.pem");
-    }
-
-    [Fact(Skip = "Requires a key.pem file")]
-    public void can_create_uma_client_with_tls_and_api_key()
-    {
-        using var umaClient = UmaClient.Connect("localhost", 50051, "~/code/key.pem", "my-api-key");
-    }
-
     [Fact]
     public async Task can_append_and_read_list_of_events()
     {
@@ -91,40 +73,4 @@ public class Examples
         var actualPosition = await umaClient.GetTrackingInfoAsync(expectedTrackingInfo.Source);
         Assert.Equal(actualPosition, expectedTrackingInfo.Position);
     }
-    
-    [Fact]
-    public async Task when_storing_non_increasing_then_integrity_error_is_thrown()
-    {
-        using var umaClient = UmaClient.Connect("localhost", 50051);
-        var trackingInfo = new UmaTrackingInfo($"{Guid.NewGuid()}", 20);
-        await umaClient.AppendAsync(events: [], trackingInfo: trackingInfo);
-        // TODO: Add Custom Exceptions
-        var exception = await Assert.ThrowsAsync<Grpc.Core.RpcException>(
-            () => umaClient.AppendAsync(events: [], trackingInfo: trackingInfo).AsTask());
-        Assert.Equal(Grpc.Core.StatusCode.FailedPrecondition, exception.Status.StatusCode);
-    }
-
-    [Fact]
-    public async Task when_appending_events_conditionally_and_condition_fails_then_FailedPrecondition_is_thrown()
-    {
-        using var umaClient = UmaClient.Connect("localhost", 50051);
-        var evt1 = new OrderCreated(Guid.NewGuid(), 100m);
-        var evt2 = new OrderCreated(Guid.NewGuid(), 100m);
-        var filter = UmaFilter.Where(types: [nameof(OrderCreated)], tags: [$"order-{evt1.OrderId}"]);
-        var umaEvt1 = new UmaEvent(
-            nameof(OrderCreated),
-            JsonSerializer.SerializeToUtf8Bytes(evt1),
-            [$"order-{evt1.OrderId}"]);
-        var umaEvt2 = new UmaEvent(
-            nameof(OrderCreated),
-            JsonSerializer.SerializeToUtf8Bytes(evt2),
-            [$"order-{evt2.OrderId}"]);
-        await umaClient.AppendAsync(events: [umaEvt1], failIfMatch: filter);
-        var exception = await Assert.ThrowsAsync<Grpc.Core.RpcException>(
-            () => umaClient.AppendAsync(events: [umaEvt2], failIfMatch: filter).AsTask());
-        Assert.Equal(Grpc.Core.StatusCode.FailedPrecondition, exception.Status.StatusCode);
-    }
 }
-
-// TODO: Subscription
-// TODO: Exceptions 

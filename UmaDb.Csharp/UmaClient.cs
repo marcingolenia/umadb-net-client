@@ -1,4 +1,5 @@
 using Client;
+using Grpc.Core;
 using Microsoft.FSharp.Core;
 using ProtoBuf.Grpc.Client;
 using UmaDb.Core;
@@ -20,14 +21,28 @@ public sealed class UmaClient(UmaConnection.UmaConnectionResult connection) : ID
     
     public async ValueTask<long?> GetHeadAsync(CancellationToken ct = default)
     {
-         var response = await _service.Head(new HeadRequest { _unused = null }, ct);
-         return (long?)response.Position;
+        try
+        {
+            var response = await _service.Head(new HeadRequest { _unused = null }, ct);
+            return (long?)response.Position;
+        }
+        catch (RpcException ex)
+        {
+            throw UmaDbException.ToUmaDbException(ex);
+        }
     }
     
     public async ValueTask<long?> GetTrackingInfoAsync(string source, CancellationToken ct = default)
     {
-         var response = await _service.GetTrackingInfo(new TrackingRequest { Source = source }, ct);
-         return (long?)response.Position;
+        try
+        {
+            var response = await _service.GetTrackingInfo(new TrackingRequest { Source = source }, ct);
+            return (long?)response.Position;
+        }
+        catch (RpcException ex)
+        {
+            throw UmaDbException.ToUmaDbException(ex);
+        }
     }
 
     public Task<List<SequencedUmaEvent>> ReadListAsync(UmaFilter filter, CancellationToken ct = default) =>
@@ -48,11 +63,11 @@ public sealed class UmaClient(UmaConnection.UmaConnectionResult connection) : ID
         CancellationToken ct = default) =>
         ReadAsync(new UmaQuery(filter, new UmaQueryOptions()), ct);
 
-    public IAsyncEnumerable<UmaReadBatch> ReadAsync(
+    public async IAsyncEnumerable<UmaReadBatch> ReadAsync(
         UmaQuery query,
-        CancellationToken ct = default)
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
     {
-        return _service.Read(new ReadRequest
+        var enumerable = _service.Read(new ReadRequest
         {
             Query = query.Filter.ToProto(),
             Start = (ulong?)query.Options.FromPosition,
@@ -69,41 +84,68 @@ public sealed class UmaClient(UmaConnection.UmaConnectionResult connection) : ID
                     e.Event.Tags?.ToArray(),
                     string.IsNullOrEmpty(e.Event.Uuid) ? null : Guid.TryParse(e.Event.Uuid, out var guid) ? guid : null))).ToList(),
             response.Head.HasValue ? (long)response.Head.Value : null));
+
+        var enumerator = enumerable.GetAsyncEnumerator(ct);
+        await using (enumerator)
+        {
+            while (true)
+            {
+                UmaReadBatch current;
+                try
+                {
+                    if (!await enumerator.MoveNextAsync())
+                        break;
+                    current = enumerator.Current;
+                }
+                catch (RpcException ex)
+                {
+                    throw UmaDbException.ToUmaDbException(ex);
+                }
+                yield return current;
+            }
+        }
     }
     
-    public ValueTask<AppendResponse> AppendAsync(
+    public async ValueTask<AppendResponse> AppendAsync(
         IEnumerable<UmaEvent> events,
         UmaFilter? failIfMatch = null,
         long? after = null,
         UmaTrackingInfo? trackingInfo = null,
         CancellationToken ct = default)
     {
-        var request = new AppendRequest
+        try
         {
-            Events = [.. events.Select(e => new Event
+            var request = new AppendRequest
             {
-                EventType = e.EventType,
-                Tags = e.Tags?.ToList() ?? [],
-                Data = e.Data.ToArray(),
-                Uuid = (e.Id ?? Guid.NewGuid()).ToString()
-            })],
-            Condition = failIfMatch != null
-                ? new AppendCondition
+                Events = [.. events.Select(e => new Event
                 {
-                    FailIfEventsMatch = failIfMatch.ToProto(),
-                    After = (ulong?)after
-                }
-                : null,
-            TrackingInfo = trackingInfo != null
-                ? new TrackingInfo
-                {
-                    Source = trackingInfo.Source,
-                    Position = (ulong)trackingInfo.Position
-                }
-                : null
-        };
+                    EventType = e.EventType,
+                    Tags = e.Tags?.ToList() ?? [],
+                    Data = e.Data.ToArray(),
+                    Uuid = (e.Id ?? Guid.NewGuid()).ToString()
+                })],
+                Condition = failIfMatch != null
+                    ? new AppendCondition
+                    {
+                        FailIfEventsMatch = failIfMatch.ToProto(),
+                        After = (ulong?)after
+                    }
+                    : null,
+                TrackingInfo = trackingInfo != null
+                    ? new TrackingInfo
+                    {
+                        Source = trackingInfo.Source,
+                        Position = (ulong)trackingInfo.Position
+                    }
+                    : null
+            };
 
-        return _service.Append(request, ct);
+            return await _service.Append(request, ct);
+        }
+        catch (RpcException ex)
+        {
+            throw UmaDbException.ToUmaDbException(ex);
+        }
     }
     
     public static UmaClient Connect(
