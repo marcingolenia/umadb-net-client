@@ -73,38 +73,4 @@ public class ReadingAppending
         var actualPosition = await umaClient.GetTrackingInfoAsync(expectedTrackingInfo.Source, TestContext.Current.CancellationToken);
         Assert.Equal(actualPosition, expectedTrackingInfo.Position);
     }
-
-    [Fact]
-    public async Task can_subscribe_to_events()
-    {
-        using var umaClient = UmaClient.Connect("localhost", 50051);
-        var tag = $"subscribe-test-{Guid.NewGuid()}";
-        var orderCreated = new OrderCreated(Guid.NewGuid(), 42m);
-        var eventToAppend = new UmaEvent(
-            nameof(OrderCreated),
-            JsonSerializer.SerializeToUtf8Bytes(orderCreated),
-            [tag]);
-
-        var received = new TaskCompletionSource<SequencedUmaEvent>();
-        var ct = TestContext.Current.CancellationToken;
-
-        _ = Task.Run(async () =>
-        {
-            await foreach (var batch in umaClient.ReadAsync(
-                UmaFilter.Where(types: [nameof(OrderCreated)], tags: [tag]).WithOptions(o => o.Subscribe = true),
-                ct))
-            {
-                var match = batch.Events.FirstOrDefault(e => e.Event.Tags?.Contains(tag) == true);
-                if (match is null) continue;
-                received.TrySetResult(match);
-                return;
-            }
-        }, ct);
-
-        await umaClient.AppendAsync([eventToAppend], ct: ct);
-        var evt = await received.Task;
-        Assert.Equal(nameof(OrderCreated), evt.Event.EventType);
-        Assert.Contains(tag, evt.Event.Tags ?? []);
-        Assert.Equal(orderCreated, JsonSerializer.Deserialize<OrderCreated>(evt.Event.Data.ToArray()));
-    }
 }

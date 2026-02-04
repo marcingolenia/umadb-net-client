@@ -63,15 +63,12 @@ I can help you write the first piece of the puzzle: the **F# DataContracts** usi
 ## Usage Examples
 
 ### C# (Explicit & Familiar)
-TODO
 ```csharp
 // Returns Task<T>, requires explicit CancellationToken
 var response = await client.AppendAsync(request, cancellationToken);
-
 ```
 
 ### F# (Idiomatic & Implicit)
-TODO
 ```fsharp
 // Returns Async<T>, token is pulled from the ambient async context
 async {
@@ -80,8 +77,6 @@ async {
 }
 
 ```
-
-Use this version in your README:
 
 ---
 
@@ -97,8 +92,74 @@ Use this version in your README:
 
 **Recommendations:**
 
-- **C#:** Register `UmaClient` as a **singleton** in your DI container (e.g. with `AddUmaDbClient` from this library). Resolve it where needed; the host will dispose it on shutdown.
+- **C#:** Register `UmaClient` as a **singleton** in your DI container (see the DI example below). Resolve it where needed; the host will dispose it on shutdown.
 - **F#:** Create **one** `UmaClient` at application startup (e.g. in `main` with `use client = UmaClient.Connect(...)`) and **pass it as an argument** to the functions that need it. Dispose only at process exit.
+
+---
+
+## Building projections with `Subscribe`
+
+Run subscriptions in a **dedicated worker** (e.g. a separate process or a `BackgroundService`), not inside the web request pipeline. The web app then reads from the **projection store** (database/cache) that the worker updates.
+
+### Register in Microsoft dependency injection
+
+Requires `Microsoft.Extensions.Options` (and `Microsoft.Extensions.Configuration` if binding from appsettings). Usings: `UmaDb.Csharp`, `UmaDb.Csharp.Messages`, `Microsoft.Extensions.Options`.
+
+```csharp
+// appsettings.json: "UmaDb": { "Host": "localhost", "Port": 50051, "CaCert": null, "ApiKey": null }
+public class UmaDbOptions
+{
+    public string Host { get; set; } = "localhost";
+    public int Port { get; set; } = 50051;
+    public string? CaCert { get; set; }
+    public string? ApiKey { get; set; }
+}
+
+// In Program.cs or AddServices:
+builder.Services.Configure<UmaDbOptions>(builder.Configuration.GetSection("UmaDb"));
+builder.Services.AddSingleton<UmaClient>(sp =>
+{
+    var options = sp.GetRequiredService<IOptions<UmaDbOptions>>().Value;
+    return UmaClient.Connect(options.Host, options.Port, options.CaCert, options.ApiKey);
+});
+builder.Services.AddHostedService<OrderProjectionService>();
+```
+
+The host disposes the singleton `UmaClient` on shutdown (singletons that implement `IDisposable` are disposed when the host stops). Register your projection store (e.g. `IProjectionStore`) as needed.
+
+### Worker
+
+Use `using var subscription = ...` inside `ExecuteAsync`. When the host stops, `stoppingToken` is cancelled, you leave the method, and the `using` disposes the subscription.
+
+```csharp
+public class OrderProjectionService : BackgroundService
+{
+    private readonly UmaClient _umaClient;
+    private readonly IProjectionStore _store;
+
+    public OrderProjectionService(UmaClient umaClient, IProjectionStore store)
+    {
+        _umaClient = umaClient;
+        _store = store;
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        void OnEvent(SequencedUmaEvent evt)
+        {
+            // Build projection (idempotent), then persist + checkpoint
+            _store.Upsert(evt);
+        }
+
+        using var subscription = _umaClient.Subscribe(
+            UmaFilter.Where(types: [nameof(OrderCreated), nameof(OrderShipped)]),
+            OnEvent,
+            stoppingToken);
+
+        await Task.Delay(Timeout.Infinite, stoppingToken);
+    }
+}
+```
 
 ---
 

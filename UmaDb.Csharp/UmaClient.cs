@@ -63,6 +63,51 @@ public sealed class UmaClient(UmaConnection.UmaConnectionResult connection) : ID
         CancellationToken ct = default) =>
         ReadAsync(new UmaQuery(filter, new UmaQueryOptions()), ct);
 
+    /// <summary>
+    /// Subscribes to the event store and invokes <paramref name="onEvent"/> for each event.
+    /// The subscription runs on a background task until the returned handle is disposed,
+    /// <paramref name="ct"/> is cancelled, or the client is disposed.
+    /// </summary>
+    /// <remarks>
+    /// Exceptions from the stream or from <paramref name="onEvent"/> are not thrown to the caller;
+    /// handle errors inside <paramref name="onEvent"/> or subscribe to <see cref="TaskScheduler.UnobservedTaskException"/>.
+    /// </remarks>
+    /// <returns>An <see cref="IDisposable"/> that stops the subscription when disposed.</returns>
+    public IDisposable Subscribe(UmaFilter filter, Action<SequencedUmaEvent> onEvent, CancellationToken ct = default)
+    {
+        var query = new UmaQuery(filter, new UmaQueryOptions { Subscribe = true });
+        var stopCts = new CancellationTokenSource();
+        var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct, stopCts.Token);
+        var token = linkedCts.Token;
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await foreach (var batch in ReadAsync(query, token).ConfigureAwait(false))
+                {
+                    foreach (var evt in batch.Events)
+                        onEvent(evt);
+                }
+            }
+            finally
+            {
+                linkedCts.Dispose();
+            }
+        }, token);
+
+        return new SubscriptionHandle(stopCts);
+    }
+
+    private sealed class SubscriptionHandle(CancellationTokenSource cts) : IDisposable
+    {
+        public void Dispose()
+        {
+            cts.Cancel();
+            cts.Dispose();
+        }
+    }
+
     public async IAsyncEnumerable<UmaReadBatch> ReadAsync(
         UmaQuery query,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
