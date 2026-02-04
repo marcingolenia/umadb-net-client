@@ -13,16 +13,20 @@ public class Connecting
     }
     
     [Fact]
-    public async Task can_create_uma_client_with_tls()
+    public async Task cannot_create_uma_client_without_tls_if_server_requires_tls()
     {
-        using var umaClient = UmaClient.Connect("localhost", 50001, "certs/ca.pem");
-        await umaClient.GetHeadAsync();
+        using var umaClient = UmaClient.Connect("localhost", 50001);
+        var exception = await Assert.ThrowsAsync<UmaDbException>(() => umaClient.GetHeadAsync().AsTask());
+        Assert.IsType<UmaDbException>(exception);
     }
     
     [Fact]
-    public void cannot_create_uma_client_without_tls_if_server_requires_tls()
+    public async Task cannot_create_uma_client_without_apikey_if_server_requires_tls_with_apikey()
     {
-        using var umaClient = UmaClient.Connect("localhost", 50001);
+        using var umaClient = UmaClient.Connect("localhost", 50001, "certs/ca.pem");
+        var exception = await Assert.ThrowsAsync<UmaDbException.AuthenticationException>(() => umaClient.GetHeadAsync().AsTask());
+        Assert.IsType<UmaDbException.AuthenticationException>(exception);
+        Assert.Equal("Authentication error: missing or invalid API key", exception.Message);
     }
 
     [Fact]
