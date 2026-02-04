@@ -23,6 +23,5 @@
     </ItemGroup>
     <ItemGroup>
       <ProjectReference Include="..\UmaDb.Core\UmaDb.Core.fsproj" />
-      <ProjectReference Include="..\UmaDb.FSharp\UmaDb.FSharp.fsproj" />
     </ItemGroup>
 </Project>
