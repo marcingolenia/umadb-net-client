@@ -29,10 +29,10 @@ public class ReadingAppending
             [$"order-{orderShipped.OrderId}"]
         );
 
-        await umaClient.AppendAsync([evt1, evt2]);
+        await umaClient.AppendAsync([evt1, evt2], ct: TestContext.Current.CancellationToken);
         var query = UmaFilter.Where([nameof(OrderCreated)], [$"order-{orderCreated.OrderId}"]).WithOptions(o => o.Limit = 1);
-        var events = await umaClient.ReadListAsync(query);
-        
+        var events = await umaClient.ReadListAsync(query, TestContext.Current.CancellationToken);
+
         var payload = JsonSerializer.Deserialize<OrderCreated>(events[0].Event.Data.ToArray());
         Assert.Single(events);
         Assert.Equal(orderCreated, payload);
@@ -48,19 +48,19 @@ public class ReadingAppending
             JsonSerializer.SerializeToUtf8Bytes(orderCreated),
             [$"order-{orderCreated.OrderId}"]
         );
-        await umaClient.AppendAsync([evt1, evt1, evt1, evt1, evt1, evt1, evt1, evt1, evt1, evt1, evt1]);
-        var events = umaClient.ReadAsync(UmaFilter.All.WithOptions(o => o.BatchSize = 5));
+        await umaClient.AppendAsync([evt1, evt1, evt1, evt1, evt1, evt1, evt1, evt1, evt1, evt1, evt1], ct: TestContext.Current.CancellationToken);
+        var events = umaClient.ReadAsync(UmaFilter.All.WithOptions(o => o.BatchSize = 5), TestContext.Current.CancellationToken);
         List<UmaReadBatch> batches = [];
         await foreach (var batch in events) batches.Add(batch);
         Assert.True(batches.Count > 1);
-        Assert.Equal(batches.First().Events.Count, 5);
+        Assert.Equal(5, batches.First().Events.Count);
     }
-    
+
     [Fact]
     public async Task can_get_head_position()
     {
         using var umaClient = UmaClient.Connect("localhost", 50051);
-        var head = await umaClient.GetHeadAsync();
+        var head = await umaClient.GetHeadAsync(TestContext.Current.CancellationToken);
         Assert.NotNull(head);
     }
 
@@ -69,8 +69,42 @@ public class ReadingAppending
     {
         using var umaClient = UmaClient.Connect("localhost", 50051);
         var expectedTrackingInfo = new UmaTrackingInfo($"{Guid.NewGuid()}", 20);
-        await umaClient.AppendAsync(events: [], trackingInfo: expectedTrackingInfo);
-        var actualPosition = await umaClient.GetTrackingInfoAsync(expectedTrackingInfo.Source);
+        await umaClient.AppendAsync(events: [], trackingInfo: expectedTrackingInfo, ct: TestContext.Current.CancellationToken);
+        var actualPosition = await umaClient.GetTrackingInfoAsync(expectedTrackingInfo.Source, TestContext.Current.CancellationToken);
         Assert.Equal(actualPosition, expectedTrackingInfo.Position);
+    }
+
+    [Fact]
+    public async Task can_subscribe_to_events()
+    {
+        using var umaClient = UmaClient.Connect("localhost", 50051);
+        var tag = $"subscribe-test-{Guid.NewGuid()}";
+        var orderCreated = new OrderCreated(Guid.NewGuid(), 42m);
+        var eventToAppend = new UmaEvent(
+            nameof(OrderCreated),
+            JsonSerializer.SerializeToUtf8Bytes(orderCreated),
+            [tag]);
+
+        var received = new TaskCompletionSource<SequencedUmaEvent>();
+        var ct = TestContext.Current.CancellationToken;
+
+        _ = Task.Run(async () =>
+        {
+            await foreach (var batch in umaClient.ReadAsync(
+                UmaFilter.Where(types: [nameof(OrderCreated)], tags: [tag]).WithOptions(o => o.Subscribe = true),
+                ct))
+            {
+                var match = batch.Events.FirstOrDefault(e => e.Event.Tags?.Contains(tag) == true);
+                if (match is null) continue;
+                received.TrySetResult(match);
+                return;
+            }
+        }, ct);
+
+        await umaClient.AppendAsync([eventToAppend], ct: ct);
+        var evt = await received.Task;
+        Assert.Equal(nameof(OrderCreated), evt.Event.EventType);
+        Assert.Contains(tag, evt.Event.Tags ?? []);
+        Assert.Equal(orderCreated, JsonSerializer.Deserialize<OrderCreated>(evt.Event.Data.ToArray()));
     }
 }
