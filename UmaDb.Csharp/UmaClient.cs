@@ -45,10 +45,10 @@ public sealed class UmaClient(UmaConnection.UmaConnectionResult connection) : ID
         }
     }
 
-    public Task<UmaReadResult> ReadListAsync(UmaFilter filter, CancellationToken ct = default) =>
+    public Task<(IReadOnlyList<SequencedUmaEvent> Events, long? Head)> ReadListAsync(UmaFilter filter, CancellationToken ct = default) =>
         ReadListAsync(new UmaQuery(filter, new UmaQueryOptions()), ct);
 
-    public async Task<UmaReadResult> ReadListAsync(UmaQuery query, CancellationToken ct = default)
+    public async Task<(IReadOnlyList<SequencedUmaEvent> Events, long? Head)> ReadListAsync(UmaQuery query, CancellationToken ct = default)
     {
         var results = new List<SequencedUmaEvent>();
         long? head = null;
@@ -57,7 +57,7 @@ public sealed class UmaClient(UmaConnection.UmaConnectionResult connection) : ID
             results.AddRange(batch.Events);
             head = batch.Head ?? head;
         }
-        return new UmaReadResult(results, head);
+        return (results, head);
     }
 
     public IAsyncEnumerable<UmaReadBatch> ReadAsync(

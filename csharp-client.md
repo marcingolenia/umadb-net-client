@@ -60,8 +60,8 @@ var evt = new UmaEvent(
 var res = await client.AppendAsync([evt]);
 
 var filter = UmaFilter.Where(types: [nameof(OrderCreated)], tags: [$"order-{payload.OrderId}"]);
-var read = await client.ReadListAsync(filter);
-// read.Events, read.Head
+var (events, head) = await client.ReadListAsync(filter);
+// events, head
 ```
 
 ### 2. Consistency boundary (read–decide–append)
@@ -73,10 +73,10 @@ var tag = $"order-{orderId}";
 var filter = UmaFilter.Where(types: [nameof(OrderCreated), nameof(OrderShipped)], tags: [tag]);
 
 // Read → build decision model
-var read = await client.ReadListAsync(filter);
-foreach (var evt in read.Events)
+var (events, head) = await client.ReadListAsync(filter);
+foreach (var evt in events)
     Apply(evt);  // your logic
-var after = read.Head;
+var after = head;
 
 // Append with condition: fail if anything matching filter was written after `after`
 var newEvt = new UmaEvent(nameof(OrderShipped), data, [tag]);
@@ -158,9 +158,9 @@ var tag = "order-123";
 var filter = UmaFilter.Where(types: ["OrderCreated", "OrderShipped"], tags: [tag]);
 
 // Read, get head
-var read = await client.ReadListAsync(filter);
-foreach (var evt in read.Events) Apply(evt);
-var after = read.Head;
+var (events, head) = await client.ReadListAsync(filter);
+foreach (var evt in events) Apply(evt);
+var after = head;
 
 // Append with condition
 var evt = new UmaEvent("OrderShipped", data, [tag], id: Guid.NewGuid());
@@ -183,7 +183,7 @@ var pos2 = await client.AppendAsync([evt], failIfMatch: filter, after: after);
 |--------|--------|
 | `Connect(host, port, caCert?, apiKey?)` | Build client. TLS when `caCert` is set. Reuse instance. |
 | `AppendAsync(events, failIfMatch?, after?, trackingInfo?, ct)` | Append; returns `AppendResponse.Position`. Throws `IntegrityException` when condition fails. |
-| `ReadListAsync(filter \| query, ct)` | All matching events and head: `UmaReadResult(Events, Head)`. |
+| `ReadListAsync(filter \| query, ct)` | Returns `(Events, Head)` tuple. |
 | `ReadAsync(filter \| query, ct)` | `IAsyncEnumerable<UmaReadBatch>`. Each batch: `Events`, `Head`. |
 | `Subscribe(filter, onEvent, ct)` | Background subscription; returns `IDisposable`. Handle exceptions in `onEvent`. |
 | `GetHeadAsync(ct)` | Last position or `null`. |
@@ -200,7 +200,6 @@ var pos2 = await client.AppendAsync([evt], failIfMatch: filter, after: after);
 
 - **UmaEvent**(`EventType`, `Data` (bytes), `Tags?`, `Id?`) — event to append or read.
 - **SequencedUmaEvent**(`Position`, `Event`) — read result.
-- **UmaReadResult**(`Events`, `Head?`) — result of `ReadListAsync`: list and head after read.
 - **UmaReadBatch**(`Events`, `Head?`) — batch and last known position.
 - **UmaTrackingInfo**(`Source`, `Position`) — upstream checkpoint.
 - **AppendResponse** — `Position` (commit position).
