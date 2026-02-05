@@ -45,17 +45,19 @@ public sealed class UmaClient(UmaConnection.UmaConnectionResult connection) : ID
         }
     }
 
-    public Task<List<SequencedUmaEvent>> ReadListAsync(UmaFilter filter, CancellationToken ct = default) =>
+    public Task<UmaReadResult> ReadListAsync(UmaFilter filter, CancellationToken ct = default) =>
         ReadListAsync(new UmaQuery(filter, new UmaQueryOptions()), ct);
 
-    public async Task<List<SequencedUmaEvent>> ReadListAsync(UmaQuery query, CancellationToken ct = default)
+    public async Task<UmaReadResult> ReadListAsync(UmaQuery query, CancellationToken ct = default)
     {
         var results = new List<SequencedUmaEvent>();
-        await foreach (var response in ReadAsync(query, ct).ConfigureAwait(false))
+        long? head = null;
+        await foreach (var batch in ReadAsync(query, ct).ConfigureAwait(false))
         {
-            results.AddRange(response.Events);
+            results.AddRange(batch.Events);
+            head = batch.Head ?? head;
         }
-        return results;
+        return new UmaReadResult(results, head);
     }
 
     public IAsyncEnumerable<UmaReadBatch> ReadAsync(

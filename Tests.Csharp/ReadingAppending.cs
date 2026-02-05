@@ -31,10 +31,10 @@ public class ReadingAppending
 
         await umaClient.AppendAsync([evt1, evt2], ct: TestContext.Current.CancellationToken);
         var query = UmaFilter.Where([nameof(OrderCreated)], [$"order-{orderCreated.OrderId}"]).WithOptions(o => o.Limit = 1);
-        var events = await umaClient.ReadListAsync(query, TestContext.Current.CancellationToken);
+        var result = await umaClient.ReadListAsync(query, TestContext.Current.CancellationToken);
 
-        var payload = JsonSerializer.Deserialize<OrderCreated>(events[0].Event.Data.ToArray());
-        Assert.Single(events);
+        var payload = JsonSerializer.Deserialize<OrderCreated>(result.Events[0].Event.Data.ToArray());
+        Assert.Single(result.Events);
         Assert.Equal(orderCreated, payload);
     }
 
@@ -103,10 +103,10 @@ public class ReadingAppending
             new UmaEvent("C", new ReadOnlyMemory<byte>([3]), [tag]),
         ], ct: TestContext.Current.CancellationToken);
         var query = UmaFilter.Where(["A", "B", "C"], [tag]).WithOptions(o => { o.Backwards = true; o.Limit = 2; });
-        var events = await umaClient.ReadListAsync(query, TestContext.Current.CancellationToken);
-        Assert.Equal(2, events.Count);
-        Assert.Equal("C", events[0].Event.EventType);
-        Assert.Equal("B", events[1].Event.EventType);
+        var result = await umaClient.ReadListAsync(query, TestContext.Current.CancellationToken);
+        Assert.Equal(2, result.Events.Count);
+        Assert.Equal("C", result.Events[0].Event.EventType);
+        Assert.Equal("B", result.Events[1].Event.EventType);
     }
 
     [Fact]
@@ -122,8 +122,8 @@ public class ReadingAppending
             after = batch.Head;
         var evt2 = new UmaEvent(nameof(OrderCreated), JsonSerializer.SerializeToUtf8Bytes(new OrderCreated(Guid.NewGuid(), 2m)), [tag]);
         await umaClient.AppendAsync([evt2], failIfMatch: filter, after: after, ct: TestContext.Current.CancellationToken);
-        var list = await umaClient.ReadListAsync(filter, TestContext.Current.CancellationToken);
-        Assert.Equal(2, list.Count);
+        var listResult = await umaClient.ReadListAsync(filter, TestContext.Current.CancellationToken);
+        Assert.Equal(2, listResult.Events.Count);
     }
     
     [Fact]
