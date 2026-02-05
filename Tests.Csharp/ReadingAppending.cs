@@ -41,6 +41,7 @@ public class ReadingAppending
     [Fact]
     public async Task can_read_all_events_in_batches()
     {
+        //
         using var umaClient = UmaClient.Connect("localhost", 50051);
         var orderCreated = new OrderCreated(Guid.NewGuid(), 100m);
         var evt1 = new UmaEvent(
@@ -49,7 +50,9 @@ public class ReadingAppending
             [$"order-{orderCreated.OrderId}"]
         );
         await umaClient.AppendAsync([evt1, evt1, evt1, evt1, evt1, evt1, evt1, evt1, evt1, evt1, evt1], ct: TestContext.Current.CancellationToken);
+
         var events = umaClient.ReadAsync(UmaFilter.All.WithOptions(o => o.BatchSize = 5), TestContext.Current.CancellationToken);
+
         List<UmaReadBatch> batches = [];
         await foreach (var batch in events) batches.Add(batch);
         Assert.True(batches.Count > 1);
@@ -65,12 +68,85 @@ public class ReadingAppending
     }
 
     [Fact]
-    public async Task can_store_tracking_info()
+    public async Task append_returns_commit_position()
     {
         using var umaClient = UmaClient.Connect("localhost", 50051);
-        var expectedTrackingInfo = new UmaTrackingInfo($"{Guid.NewGuid()}", 20);
-        await umaClient.AppendAsync(events: [], trackingInfo: expectedTrackingInfo, ct: TestContext.Current.CancellationToken);
-        var actualPosition = await umaClient.GetTrackingInfoAsync(expectedTrackingInfo.Source, TestContext.Current.CancellationToken);
-        Assert.Equal(actualPosition, expectedTrackingInfo.Position);
+        var evt = new UmaEvent(nameof(OrderCreated), ReadOnlyMemory<byte>.Empty, [$"pos-{Guid.NewGuid()}"]);
+        var response = await umaClient.AppendAsync([evt], ct: TestContext.Current.CancellationToken);
+        Assert.True(response.Position > 0);
+    }
+
+    [Fact]
+    public async Task idempotent_append_with_same_id_returns_same_commit_position()
+    {
+        using var umaClient = UmaClient.Connect("localhost", 50051);
+        var tag = $"idem-{Guid.NewGuid()}";
+        var filter = UmaFilter.Where([nameof(OrderCreated)], [tag]);
+        long? after = null;
+        await foreach (var batch in umaClient.ReadAsync(filter.WithOptions(o => { }), TestContext.Current.CancellationToken))
+            after = batch.Head;
+        var id = Guid.NewGuid();
+        var evt = new UmaEvent(nameof(OrderCreated), new ReadOnlyMemory<byte>([1, 2, 3]), [tag], id);
+        var r1 = await umaClient.AppendAsync([evt], failIfMatch: filter, after: after, ct: TestContext.Current.CancellationToken);
+        var r2 = await umaClient.AppendAsync([evt], failIfMatch: filter, after: after, ct: TestContext.Current.CancellationToken);
+        Assert.Equal(r1.Position, r2.Position);
+    }
+
+    [Fact]
+    public async Task can_read_backwards()
+    {
+        using var umaClient = UmaClient.Connect("localhost", 50051);
+        var tag = $"back-{Guid.NewGuid()}";
+        await umaClient.AppendAsync([
+            new UmaEvent("A", new ReadOnlyMemory<byte>([1]), [tag]),
+            new UmaEvent("B", new ReadOnlyMemory<byte>([2]), [tag]),
+            new UmaEvent("C", new ReadOnlyMemory<byte>([3]), [tag]),
+        ], ct: TestContext.Current.CancellationToken);
+        var query = UmaFilter.Where(["A", "B", "C"], [tag]).WithOptions(o => { o.Backwards = true; o.Limit = 2; });
+        var events = await umaClient.ReadListAsync(query, TestContext.Current.CancellationToken);
+        Assert.Equal(2, events.Count);
+        Assert.Equal("C", events[0].Event.EventType);
+        Assert.Equal("B", events[1].Event.EventType);
+    }
+
+    [Fact]
+    public async Task consistency_boundary_read_then_append_with_condition_after_head()
+    {
+        using var umaClient = UmaClient.Connect("localhost", 50051);
+        var tag = $"cb-{Guid.NewGuid()}";
+        var filter = UmaFilter.Where([nameof(OrderCreated)], [tag]);
+        var evt1 = new UmaEvent(nameof(OrderCreated), JsonSerializer.SerializeToUtf8Bytes(new OrderCreated(Guid.NewGuid(), 1m)), [tag]);
+        await umaClient.AppendAsync([evt1], failIfMatch: filter, after: null, ct: TestContext.Current.CancellationToken);
+        long? after = null;
+        await foreach (var batch in umaClient.ReadAsync(filter.WithOptions(o => { }), TestContext.Current.CancellationToken))
+            after = batch.Head;
+        var evt2 = new UmaEvent(nameof(OrderCreated), JsonSerializer.SerializeToUtf8Bytes(new OrderCreated(Guid.NewGuid(), 2m)), [tag]);
+        await umaClient.AppendAsync([evt2], failIfMatch: filter, after: after, ct: TestContext.Current.CancellationToken);
+        var list = await umaClient.ReadListAsync(filter, TestContext.Current.CancellationToken);
+        Assert.Equal(2, list.Count);
+    }
+    
+    [Fact]
+    public async Task when_appending_events_conditionally_and_condition_fails_then_IntegrityException_is_thrown()
+    {
+        using var umaClient = UmaClient.Connect("localhost", 50051);
+        var evt1 = new OrderCreated(Guid.NewGuid(), 100m);
+        var evt2 = new OrderCreated(Guid.NewGuid(), 100m);
+        var filter = UmaFilter.Where(types: [nameof(OrderCreated)], tags: [$"order-{evt1.OrderId}"]);
+        var umaEvt1 = new UmaEvent(
+            nameof(OrderCreated),
+            JsonSerializer.SerializeToUtf8Bytes(evt1),
+            [$"order-{evt1.OrderId}"]);
+        var umaEvt2 = new UmaEvent(
+            nameof(OrderCreated),
+            JsonSerializer.SerializeToUtf8Bytes(evt2),
+            [$"order-{evt2.OrderId}"]);
+        
+        await umaClient.AppendAsync(events: [umaEvt1], failIfMatch: filter);
+        
+        var exception = await Assert.ThrowsAsync<UmaDbException.IntegrityException>(
+            () => umaClient.AppendAsync(events: [umaEvt2], failIfMatch: filter).AsTask());
+        
+        Assert.IsAssignableFrom<UmaDbException>(exception);
     }
 }

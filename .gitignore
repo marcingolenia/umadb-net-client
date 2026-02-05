@@ -7,11 +7,3 @@ riderModule.iml
 nuget
 *.user
 
-# Generated TLS certs (private keys)
-Tests/certs/
-
-# Charity Portal
-CharityPortal/.tool-versions
-CharityPortal/tmp
-CharityPortal/.env
-CharityPortal/.env.*
