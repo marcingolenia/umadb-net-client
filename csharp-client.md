@@ -196,6 +196,8 @@ var pos2 = await client.AppendAsync([evt], failIfMatch: filter, after: after);
 - `.Or(types?, tags?)` — add another OR clause.
 - `.WithOptions(o => { o.FromPosition = n; o.Limit = n; o.BatchSize = n; o.Backwards = true; o.Subscribe = true; })` — read options.
 
+**When to use:** `FromPosition` / `Limit` for resuming or paging; `Subscribe` for live projections; `Backwards` to read from the end.
+
 ### Core types
 
 - **UmaEvent**(`EventType`, `Data` (bytes), `Tags?`, `Id?`) — event to append or read.
