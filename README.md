@@ -4,6 +4,8 @@ A high-performance, low-allocation .NET client for [UmaDB](https://umadb.io/), d
 
 **Documentation:** [C# client guide](csharp-client.md) — connection, concepts, recipes (append/read, consistency boundaries, projections, tracking, idempotent append), API reference, and managing client lifetime.
 
+**F# client:** under development.
+
 ---
 
 ## Architecture Decision Records (ADR)
