@@ -28,6 +28,14 @@ using var client = UmaClient.Connect("localhost", 50051, caCert: "certs/ca.pem",
 
 ---
 
+## Concepts
+
+- **Query** — A filter over the log. Built with `UmaFilter.Where(types, tags)` and `.Or(...)`. Each *query item* matches events whose type is in `types` (or any if empty) **and** whose tags include all of `tags` (or any if empty). Multiple items are combined with **OR** (an event matches if any item matches).
+- **Append condition** — `failIfMatch` + `after`. The append fails if the store contains any event matching the query **after** position `after`. Use the **same query** you used to read and the **head** from that read as `after`; then no one else can have written matching events in between.
+- **Tracking** — `UmaTrackingInfo(Source, Position)`. Records “I’ve processed up to this position on this upstream.” Stored atomically with the events you append. Positions must be strictly increasing per source.
+
+---
+
 ## Recipes
 
 ### 1. Append and read
@@ -135,6 +143,34 @@ var evt = new UmaEvent("OrderCreated", data, [tag], id: Guid.NewGuid());
 var r1 = await client.AppendAsync([evt], failIfMatch: filter, after: after);
 var r2 = await client.AppendAsync([evt], failIfMatch: filter, after: after);
 // r1.Position == r2.Position
+```
+
+---
+
+## Example: full flow
+
+One narrative: read → conditional append → conflict → idempotent retry.
+
+```csharp
+using var client = UmaClient.Connect("localhost", 50051);
+
+var tag = "order-123";
+var filter = UmaFilter.Where(types: ["OrderCreated", "OrderShipped"], tags: [tag]);
+
+// Read, get head
+var read = await client.ReadListAsync(filter);
+foreach (var evt in read.Events) Apply(evt);
+var after = read.Head;
+
+// Append with condition
+var evt = new UmaEvent("OrderShipped", data, [tag], id: Guid.NewGuid());
+var pos = await client.AppendAsync([evt], failIfMatch: filter, after: after);
+
+// Concurrent write: same condition + after would throw IntegrityException → reload and retry.
+
+// Idempotent retry with same event Id returns same position
+var pos2 = await client.AppendAsync([evt], failIfMatch: filter, after: after);
+// pos.Position == pos2.Position
 ```
 
 ---
