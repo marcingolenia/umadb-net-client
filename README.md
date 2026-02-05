@@ -21,21 +21,7 @@ A high-performance, low-allocation .NET client for **UmaDB**, designed specifica
 
 ## Usage Examples
 
-### C# (Explicit & Familiar)
-```csharp
-// Returns Task<T>, requires explicit CancellationToken
-var response = await client.AppendAsync(request, cancellationToken);
-```
-
-### F# (Idiomatic & Implicit)
-```fsharp
-// Returns Async<T>, token is pulled from the ambient async context
-async {
-    let! response = client.Append(request)
-    return response
-}
-
-```
+TODO
 
 ---
 
