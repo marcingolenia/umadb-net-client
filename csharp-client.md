@@ -10,7 +10,7 @@ head:
 
 # C# Client for UmaDB
 
-High-performance .NET client for [UmaDB](https://umadb.io/) via gRPC. Implements [DCB](https://dcb.events/specification/) for optimistic concurrency in event-sourced systems.
+High-performance .NET client for [UmaDB](https://umadb.io/) via gRPC. Implements [DCB](https://dcb.events/specification/) for optimistic concurrency in event-sourced systems. The client is **async-only** (no synchronous API is provided or planned). If you must call from synchronous code, block on the returned task (e.g. `client.AppendAsync(...).GetAwaiter().GetResult()`); avoid doing that on a thread that has a synchronization context (e.g. UI or legacy ASP.NET) to prevent deadlocks.
 
 ## Connection
 
