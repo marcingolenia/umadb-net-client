@@ -1,18 +1,26 @@
 module Tests.SocketExhautions
 
-open Client
+open System
 open Xunit
-open UmaClient
+open ProtoBuf.Grpc.Client
 open FsUnit.Xunit
+open UmaDb.Core
+open Client.UmaConnection
 
 [<Fact>]
 let ``Stress Test: High concurrency should not leak sockets`` () =
     let iterations = 1000
 
     async {
-        use client = UmaClient.Connect("localhost", 50051)
+        AppContext.SetSwitch("System.Net.Http.SocketsHttpHandler.Http2UnencryptedSupport", true)
+        use connection = UmaConnection.create "localhost" 50051 None None
+        let callInvoker = connection.GetCallInvoker()
+        let client = callInvoker.CreateGrpcService<IDcbService>()
 
-        let getHeadAsync _ = client.GetHeadAsync().AsTask() |> Async.AwaitTask
+        let getHeadAsync _ = 
+            client.Head({ _unused = Nullable() }, ProtoBuf.Grpc.CallContext.Default)
+                .AsTask()
+                |> Async.AwaitTask
 
         let! results =
             List.init iterations id

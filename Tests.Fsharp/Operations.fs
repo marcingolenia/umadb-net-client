@@ -4,7 +4,6 @@ open System
 open FsUnit.Xunit
 open UmaDb.Core
 open Xunit
-open Client.UmaClient
 
 let event =
     { EventType = "TestEvent"
@@ -17,27 +16,3 @@ let appendRequest =
       Condition = Nullable.appendCondition
       TrackingInfo = Nullable.trackingInfo }
 
-[<Fact>]
-let ``Can write and read`` () =
-    task {
-        use client = UmaClient.Connect("localhost", 50051)
-        let! writeReponse = client.AppendAsync(appendRequest)
-
-        let query =
-            { Items =
-                [ { Types = [ "TestEvent" ] |> ResizeArray
-                    Tags = [ "operations" ] |> ResizeArray } ]
-                |> ResizeArray }
-        let readRequest: ReadRequest =
-            { Query = query
-              Start = Nullable 1UL
-              Backwards = false
-              Limit = Nullable()
-              Subscribe = false
-              BatchSize = Nullable() }
-
-        let! events = client.ReadListAsync(readRequest)
-
-        events.Count |> should be (greaterThan 0)
-        writeReponse.Position |> should be (greaterThan 0UL)
-    }

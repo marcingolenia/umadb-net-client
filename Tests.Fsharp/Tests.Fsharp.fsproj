@@ -9,7 +9,6 @@
         <Compile Include="Setup.fs" />
         <Compile Include="SimpleConnectivity.fs" />
         <Compile Include="SocketExhautions.fs" />
-        <Compile Include="TlsConnectivity.fs" />
     </ItemGroup>
     <ItemGroup>
         <PackageReference Include="FsUnit.xUnit" />

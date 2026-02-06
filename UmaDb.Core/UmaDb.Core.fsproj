@@ -7,7 +7,6 @@
         <Compile Include="Messages.fs"/>
         <Compile Include="DcbService.fs"/>
         <Compile Include="UmaConnection.fs" />
-        <Compile Include="UmaClient.fs" />
     </ItemGroup>
     <ItemGroup>
         <PackageReference Include="Grpc.Net.Client" />
