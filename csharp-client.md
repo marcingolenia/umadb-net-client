@@ -61,7 +61,6 @@ var res = await client.AppendAsync([evt]);
 
 var filter = UmaFilter.Where(types: [nameof(OrderCreated)], tags: [$"order-{payload.OrderId}"]);
 var (events, head) = await client.ReadListAsync(filter);
-// events, head
 ```
 
 ### 2. Consistency boundary (read–decide–append)
@@ -216,9 +215,19 @@ var pos2 = await client.AppendAsync([evt], failIfMatch: filter, after: after);
 
 Use **one** client per process. Creating a client per call adds connection overhead.
 
+- **Reuse channels:** *"A gRPC channel should be reused when making gRPC calls. Reusing a channel allows calls to be multiplexed through an existing HTTP/2 connection."*
+
+- **Cost of creating a new channel per call:** *"If a new channel is created for each gRPC call then the amount of time it takes to complete can increase significantly. Each call will require multiple network round-trips between the client and the server to create a new HTTP/2 connection: 1. Opening a socket 2. Establishing TCP connection 3. Negotiating TLS 4. Starting HTTP/2 connection 5. Making the gRPC call."*
+
+- **Sharing and concurrency:** *"Channels are safe to share and reuse between gRPC calls."* *"A channel and clients created from the channel can safely be used by multiple threads."* *"Clients created from the channel can make multiple simultaneous calls."*
+
+**Source:** [Performance best practices with gRPC | Microsoft Learn](https://learn.microsoft.com/en-us/aspnet/core/grpc/performance?view=aspnetcore-8.0)
+
+
 **DI (recommended):** register as singleton; host disposes on shutdown.
 
 ```csharp
+// store config as you wish, for example create UmaDbOptions class and use IOptions
 // Config: "UmaDb": { "Host", "Port", "CaCert", "ApiKey" }
 builder.Services.Configure<UmaDbOptions>(builder.Configuration.GetSection("UmaDb"));
 builder.Services.AddSingleton<UmaClient>(sp =>
