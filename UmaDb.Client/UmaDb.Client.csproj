@@ -20,6 +20,8 @@
         <PackageProjectUrl>https://github.com/marcingolenia/umadb-net-client</PackageProjectUrl>
         <RepositoryUrl>https://github.com/marcingolenia/umadb-net-client</RepositoryUrl>
         <RepositoryType>git</RepositoryType>
+        <!-- Package icon (displayed on NuGet.org) -->
+        <PackageIcon>logo.png</PackageIcon>
         <!-- Package quality (use lowercase readme.md - path in package must match exactly for NuGet.org) -->
         <PackageReadmeFile>readme.md</PackageReadmeFile>
         <Copyright>Copyright (c) 2026 UmaDb .NET Client Contributors</Copyright>
@@ -32,5 +34,7 @@
     <ItemGroup>
         <!-- Pack README at package root as readme.md (lowercase) so nuspec path matches ZIP entry for NuGet.org -->
         <None Include="..\README.md" Pack="true" PackagePath="readme.md"/>
+        <!-- Pack logo as package icon for NuGet.org -->
+        <None Include="..\logo.png" Pack="true" PackagePath="logo.png"/>
     </ItemGroup>
 </Project>
