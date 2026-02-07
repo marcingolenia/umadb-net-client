@@ -12,6 +12,17 @@ head:
 
 High-performance .NET client for [UmaDB](https://umadb.io/) via gRPC. Implements [DCB](https://dcb.events/specification/) for optimistic concurrency in event-sourced systems. The client is **async-only** (no synchronous API is provided or planned). If you must call from synchronous code, block on the returned task (e.g. `client.AppendAsync(...).GetAwaiter().GetResult()`); avoid doing that on a thread that has a synchronization context (e.g. UI or legacy ASP.NET) to prevent deadlocks.
 
+## Installation
+
+Install the [UmaDb.Client](https://www.nuget.org/packages/UmaDb.Client/) NuGet package. The package targets .NET 10.0 and is compatible with that framework or higher.
+
+**.NET CLI:**
+
+```bash
+dotnet add package UmaDb.Client
+```
+For other installation methods see [Nuget page](https://www.nuget.org/packages/UmaDb.Client/)
+
 ## Connection
 
 Build options fluently, then connect:
