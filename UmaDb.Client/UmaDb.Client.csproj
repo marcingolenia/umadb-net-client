@@ -30,6 +30,7 @@
       <PackageReference Include="protobuf-net.Grpc" />
     </ItemGroup>
     <ItemGroup>
-        <None Include="..\README.md" Pack="true" PackagePath="\"/>
+        <!-- README at package root; path must match PackageReadmeFile exactly (see https://devblogs.microsoft.com/dotnet/add-a-readme-to-your-nuget-package/) -->
+        <None Include="..\README.md" Pack="true" PackagePath="README.md"/>
     </ItemGroup>
 </Project>
