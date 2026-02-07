@@ -51,11 +51,8 @@ public class Subscribing
 
         _ = Task.Run(async () =>
         {
-            await foreach (var batch in subscription)
-            {
-                foreach (var evt in batch.Events)
-                    received.TrySetResult(evt);
-            }
+            await foreach (var evt in subscription)
+                received.TrySetResult(evt);
         }, ct);
 
         await umaClient.AppendAsync([eventToAppend], ct: ct);

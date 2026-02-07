@@ -235,7 +235,7 @@ var pos2 = await client.AppendAsync([evt], failIfMatch: filter, after: after);
 | `Connect(UmaClientOptions)` | Create client from options. Reuse the instance; dispose when shutting down. |
 | `AppendAsync(events, failIfMatch?, after?, trackingInfo?, ct)` | Append; returns `AppendResponse.Position`. Throws `IntegrityException` when condition fails. |
 | `ReadListAsync(filter \| query, ct)` | Returns `(Events, Head)` tuple. |
-| `ReadAsync(filter \| query, ct)` | `IAsyncEnumerable<UmaReadBatch>`. Each batch: `Events`, `Head`. |
+| `ReadAsync(filter \| query, ct)` | `IAsyncEnumerable<SequencedUmaEvent>`. Stream of events (batching is internal). |
 | `Subscribe(filter, onEvent, ct)` | Background subscription; returns `IDisposable`. Handle exceptions in `onEvent`. |
 | `GetHeadAsync(ct)` | Last position or `null`. |
 | `GetTrackingInfoAsync(source, ct)` | Last tracked position for source, or `null`. |
@@ -256,8 +256,7 @@ Fluent options for `Connect`. **WithHost**(`string`), **WithPort**(`int`), **Wit
 ### Core types
 
 - **UmaEvent**(`EventType`, `Data` (bytes), `Tags?`, `Id?`) — event to append or read.
-- **SequencedUmaEvent**(`Position`, `Event`) — read result.
-- **UmaReadBatch**(`Events`, `Head?`) — batch and last known position.
+- **SequencedUmaEvent**(`Position`, `Event`) — read result (each item from `ReadAsync`).
 - **UmaTrackingInfo**(`Source`, `Position`) — upstream checkpoint.
 - **AppendResponse** — `Position` (commit position).
 

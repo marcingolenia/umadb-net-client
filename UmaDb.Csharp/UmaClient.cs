@@ -70,7 +70,7 @@ public sealed class UmaClient(UmaConnection.UmaConnectionResult connection) : ID
     {
         var results = new List<SequencedUmaEvent>();
         long? head = null;
-        await foreach (var batch in ReadAsync(query, ct).ConfigureAwait(false))
+        await foreach (var batch in ReadBatchesAsync(query, ct).ConfigureAwait(false))
         {
             results.AddRange(batch.Events);
             head = batch.Head ?? head;
@@ -78,13 +78,29 @@ public sealed class UmaClient(UmaConnection.UmaConnectionResult connection) : ID
         return (results, head);
     }
 
-    /// <summary>Streams events in batches. Use for large result sets or when you need incremental processing.</summary>
+    /// <summary>Streams events one by one. Use for large result sets or when you need incremental processing. Set <see cref="UmaQueryOptions.Subscribe"/> to keep the stream open for new events.</summary>
     /// <param name="filter">Filter by event types and tags.</param>
     /// <param name="ct">Cancellation token.</param>
-    public IAsyncEnumerable<UmaReadBatch> ReadAsync(
+    /// <returns>Async sequence of <see cref="SequencedUmaEvent"/> (batch boundaries are internal).</returns>
+    public IAsyncEnumerable<SequencedUmaEvent> ReadAsync(
         UmaFilter filter,
         CancellationToken ct = default) =>
         ReadAsync(new UmaQuery(filter, new UmaQueryOptions()), ct);
+
+    /// <summary>Streams events one by one. Use <see cref="UmaQueryOptions.Subscribe"/> to keep the stream open for new events.</summary>
+    /// <param name="query">Filter and options (position, limit, batch size, backwards, subscribe).</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Async sequence of <see cref="SequencedUmaEvent"/>.</returns>
+    public async IAsyncEnumerable<SequencedUmaEvent> ReadAsync(
+        UmaQuery query,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+    {
+        await foreach (var batch in ReadBatchesAsync(query, ct).ConfigureAwait(false))
+        {
+            foreach (var evt in batch.Events)
+                yield return evt;
+        }
+    }
 
     /// <summary>
     /// Subscribes to events matching the filter; invokes <paramref name="onEvent"/> for each event on a background task.
@@ -105,11 +121,8 @@ public sealed class UmaClient(UmaConnection.UmaConnectionResult connection) : ID
         {
             try
             {
-                await foreach (var batch in ReadAsync(query, token).ConfigureAwait(false))
-                {
-                    foreach (var evt in batch.Events)
-                        onEvent(evt);
-                }
+                await foreach (var evt in ReadAsync(query, token).ConfigureAwait(false))
+                    onEvent(evt);
             }
             finally
             {
@@ -120,10 +133,7 @@ public sealed class UmaClient(UmaConnection.UmaConnectionResult connection) : ID
         return new SubscriptionHandle(stopCts);
     }
 
-    /// <summary>Streams events in batches. Use <see cref="UmaQueryOptions.Subscribe"/> to keep the stream open for new events.</summary>
-    /// <param name="query">Filter and options (position, limit, batch size, backwards, subscribe).</param>
-    /// <param name="ct">Cancellation token.</param>
-    public async IAsyncEnumerable<UmaReadBatch> ReadAsync(
+    private async IAsyncEnumerable<UmaReadBatch> ReadBatchesAsync(
         UmaQuery query,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
     {
@@ -180,7 +190,7 @@ public sealed class UmaClient(UmaConnection.UmaConnectionResult connection) : ID
     /// </summary>
     /// <param name="events">Events to append. Must not be empty.</param>
     /// <param name="failIfMatch">If set, append fails when the log contains any matching event after <paramref name="after"/> (use same filter and head from read).</param>
-    /// <param name="after">When used with <paramref name="failIfMatch"/>, only events after this position are considered. Use head from <see cref="ReadListAsync"/> or <see cref="UmaReadBatch.Head"/>.</param>
+    /// <param name="after">When used with <paramref name="failIfMatch"/>, only events after this position are considered. Use head from <see cref="ReadListAsync"/> or <see cref="GetHeadAsync"/> after a streamed read.</param>
     /// <param name="trackingInfo">Optional upstream checkpoint; stored atomically with the events. Positions must increase per source.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Response containing the commit position of the last appended event.</returns>
