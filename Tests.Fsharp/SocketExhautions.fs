@@ -13,7 +13,7 @@ let ``Stress Test: High concurrency should not leak sockets`` () =
 
     async {
         AppContext.SetSwitch("System.Net.Http.SocketsHttpHandler.Http2UnencryptedSupport", true)
-        use connection = UmaConnection.create "localhost" 50051 None None false
+        use connection = UmaConnection.create "localhost" 50002 None None false
         let callInvoker = connection.GetCallInvoker()
         let client = callInvoker.CreateGrpcService<IDcbService>()
 

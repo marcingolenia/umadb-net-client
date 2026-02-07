@@ -11,7 +11,7 @@ open Xunit
 let ``Can connect and append event using raw GrpcChannel`` () =
     task {
         AppContext.SetSwitch("System.Net.Http.SocketsHttpHandler.Http2UnencryptedSupport", true)
-        use channel = GrpcChannel.ForAddress("http://localhost:50051")
+        use channel = GrpcChannel.ForAddress("http://localhost:50002")
         let client = channel.CreateGrpcService<IDcbService>()
         let event = {
             EventType = "TestEvent"

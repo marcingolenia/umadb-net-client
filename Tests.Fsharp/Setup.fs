@@ -5,15 +5,15 @@ open DotNet.Testcontainers.Builders
 open Xunit
 
 type Setup() =
-    // do
-        // let umaDb =
-        //       ContainerBuilder("ghcr.io/umadb-io/umadb:latest")
-        //         .WithName("umadb")
-        //         .WithPortBinding(50051, 50051)
-        //         .WithReuse(true)
-        //         .Build()
+    do
+        let umaDb =
+              ContainerBuilder("ghcr.io/umadb-io/umadb:latest")
+                .WithName("umadb-fsharp")
+                .WithPortBinding(50002, 50051)
+                .WithReuse(true)
+                .Build()
 
-        // umaDb.StartAsync() |> Async.AwaitTask |> Async.RunSynchronously
+        umaDb.StartAsync() |> Async.AwaitTask |> Async.RunSynchronously
 
     interface IDisposable with
         member _.Dispose() = ()
