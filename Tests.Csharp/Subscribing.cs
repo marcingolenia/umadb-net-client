@@ -21,10 +21,36 @@ public class Subscribing
         var received = new TaskCompletionSource<SequencedUmaEvent>();
         var ct = TestContext.Current.CancellationToken;
 
-        using var subscription = umaClient.Subscribe(
+        using var subscription = umaClient.SubscribeWithCallback(
             UmaFilter.Where([nameof(OrderCreated)], [tag]),
             evt => received.TrySetResult(evt),
             ct);
+
+        await umaClient.AppendAsync([eventToAppend], ct: ct);
+
+        AssertReceivedOrderCreated(await received.Task, tag, orderCreated);
+    }
+
+    [Fact]
+    public async Task can_subscribe_using_subscribe_async()
+    {
+        using var umaClient = UmaClient.Connect(new UmaClientOptions().WithHost("localhost").WithPort(50051));
+        var tag = $"subscribe-async-{Guid.NewGuid()}";
+        var orderCreated = new OrderCreated(Guid.NewGuid(), 99m);
+        var eventToAppend = new UmaEvent(
+            nameof(OrderCreated),
+            JsonSerializer.SerializeToUtf8Bytes(orderCreated),
+            [tag]);
+
+        var received = new TaskCompletionSource<SequencedUmaEvent>();
+        var ct = TestContext.Current.CancellationToken;
+
+        _ = Task.Run(async () =>
+        {
+            await foreach (var evt in umaClient.SubscribeAsync(
+                UmaFilter.Where([nameof(OrderCreated)], [tag]), ct))
+                received.TrySetResult(evt);
+        }, ct);
 
         await umaClient.AppendAsync([eventToAppend], ct: ct);
 

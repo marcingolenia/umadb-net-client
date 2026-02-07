@@ -4,7 +4,7 @@ namespace UmaDb.Csharp;
 
 /// <summary>
 /// Builds a filter over the event log by event type and tags.
-/// Use with <see cref="UmaClient.ReadAsync"/>, <see cref="UmaClient.ReadListAsync"/>, <see cref="UmaClient.Subscribe"/>, and append conditions.
+/// Use with <see cref="UmaClient.ReadAsync"/>, <see cref="UmaClient.ReadListAsync"/>, <see cref="UmaClient.SubscribeAsync"/>, <see cref="UmaClient.SubscribeWithCallback"/>, and append conditions.
 /// </summary>
 public class UmaFilter
 {

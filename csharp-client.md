@@ -153,7 +153,7 @@ public class OrderProjectionService : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        using var sub = _client.Subscribe(
+        using var sub = _client.SubscribeWithCallback(
             UmaFilter.Where(types: [nameof(OrderCreated), nameof(OrderShipped)]),
             evt => _store.Upsert(evt),  // idempotent
             stoppingToken
@@ -163,7 +163,7 @@ public class OrderProjectionService : BackgroundService
 }
 ```
 
-For full control over the stream, use `ReadAsync` with `filter.WithOptions(o => o.Subscribe = true)`.
+For an async stream of events (e.g. `await foreach`), use `SubscribeAsync(filter, ct)`. For full control over the stream (position, limit, etc.), use `ReadAsync` with `filter.WithOptions(o => o.Subscribe = true)`.
 
 ### 4. Upstream tracking (exactly-once)
 
@@ -236,7 +236,8 @@ var pos2 = await client.AppendAsync([evt], failIfMatch: filter, after: after);
 | `AppendAsync(events, failIfMatch?, after?, trackingInfo?, ct)` | Append; returns `AppendResponse.Position`. Throws `IntegrityException` when condition fails. |
 | `ReadListAsync(filter \| query, ct)` | Returns `(Events, Head)` tuple. |
 | `ReadAsync(filter \| query, ct)` | `IAsyncEnumerable<SequencedUmaEvent>`. Stream of events (batching is internal). |
-| `Subscribe(filter, onEvent, ct)` | Background subscription; returns `IDisposable`. Handle exceptions in `onEvent`. |
+| `SubscribeAsync(filter, ct)` | `IAsyncEnumerable<SequencedUmaEvent>`. Subscription stream; use `await foreach` to consume. |
+| `SubscribeWithCallback(filter, onEvent, ct)` | Background subscription; invokes `onEvent` for each event; returns `IDisposable`. Handle exceptions in `onEvent`. |
 | `GetHeadAsync(ct)` | Last position or `null`. |
 | `GetTrackingInfoAsync(source, ct)` | Last tracked position for source, or `null`. |
 

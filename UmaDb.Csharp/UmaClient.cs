@@ -103,14 +103,14 @@ public sealed class UmaClient(UmaConnection.UmaConnectionResult connection) : ID
     }
 
     /// <summary>
-    /// Subscribes to events matching the filter; invokes <paramref name="onEvent"/> for each event on a background task.
+    /// Streams events matching the filter as they become available (subscription). Use <see cref="SubscribeAsync"/> for an async iterator; use this overload when you want to push events to a callback on a background task.
     /// Disposing the returned handle or cancelling <paramref name="ct"/> stops the subscription. Exceptions in the stream or in <paramref name="onEvent"/> are not thrown to the caller—handle them inside <paramref name="onEvent"/>.
     /// </summary>
     /// <param name="filter">Filter by event types and tags.</param>
     /// <param name="onEvent">Callback for each event. Should be idempotent when building projections.</param>
     /// <param name="ct">When cancelled, the subscription stops.</param>
     /// <returns>Disposable that stops the subscription when disposed.</returns>
-    public IDisposable Subscribe(UmaFilter filter, Action<SequencedUmaEvent> onEvent, CancellationToken ct = default)
+    public IDisposable SubscribeWithCallback(UmaFilter filter, Action<SequencedUmaEvent> onEvent, CancellationToken ct = default)
     {
         var query = new UmaQuery(filter, new UmaQueryOptions { Subscribe = true });
         var stopCts = new CancellationTokenSource();
@@ -132,6 +132,17 @@ public sealed class UmaClient(UmaConnection.UmaConnectionResult connection) : ID
 
         return new SubscriptionHandle(stopCts);
     }
+
+    /// <summary>
+    /// Subscribes to events matching the filter and yields them as an async stream (like <see cref="ReadAsync"/> but keeps the stream open for new events).
+    /// Use this when you want to consume events with <c>await foreach</c>. Use <see cref="SubscribeWithCallback"/> when you prefer a callback on a background task.
+    /// When the server exposes a dedicated Subscribe RPC, this method will use it (no backwards/limit); until then it uses the read stream with subscribe enabled.
+    /// </summary>
+    /// <param name="filter">Filter by event types and tags.</param>
+    /// <param name="ct">Cancellation token; when cancelled, the subscription stops.</param>
+    /// <returns>Async sequence of <see cref="SequencedUmaEvent"/> (existing and newly appended events).</returns>
+    public IAsyncEnumerable<SequencedUmaEvent> SubscribeAsync(UmaFilter filter, CancellationToken ct = default) =>
+        ReadAsync(new UmaQuery(filter, new UmaQueryOptions { Subscribe = true }), ct);
 
     private async IAsyncEnumerable<UmaReadBatch> ReadBatchesAsync(
         UmaQuery query,
