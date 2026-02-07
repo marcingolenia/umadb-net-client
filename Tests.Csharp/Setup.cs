@@ -17,6 +17,9 @@ namespace Tests.Csharp
         const string TLS_CERT_CONTAINER_PATH = "/etc/secrets/server.pem";
         const string TLS_KEY_CONTAINER_PATH = "/etc/secrets/server-key.pem";
 
+        static readonly object Gate = new();
+        static bool ContainersStarted;
+
         static ILogger CreateLogger()
         {
             var loggerFactory = LoggerFactory.Create(builder =>
@@ -34,6 +37,12 @@ namespace Tests.Csharp
 
         public Setup()
         {
+            lock (Gate)
+            {
+                if (ContainersStarted) return;
+                ContainersStarted = true;
+            }
+
             var logger = CreateLogger();
 
             new ContainerBuilder("ghcr.io/umadb-io/umadb:latest")
