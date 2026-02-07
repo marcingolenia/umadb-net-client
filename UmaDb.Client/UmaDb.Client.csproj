@@ -1,14 +1,35 @@
 <Project Sdk="Microsoft.NET.Sdk">
-
     <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <NoWarn>$(NoWarn);1591</NoWarn>
+        <!-- NuGet package identity -->
+        <PackageId>UmaDb.Client</PackageId>
+        <Version>1.0.0</Version>
+        <Title>UmaDb .NET Client</Title>
+        <Authors>UmaDb .NET Client Contributors</Authors>
+        <Company>UmaDb</Company>
+        <!-- Description (surfaced on NuGet.org) -->
+        <Description>A high-performance .NET client for UmaDB, designed for Dynamic Consistency Boundaries (DCB). Compatible with .NET trimming and AOT.</Description>
+        <PackageTags>umadb;grpc;event-sourcing;dcb;dynamic-consistency;event-store</PackageTags>
+        <!-- Licensing (use expression; do not use deprecated LicenseUrl) -->
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <!-- Project and repository -->
+        <PackageProjectUrl>https://github.com/marcingolenia/umadb-net-client</PackageProjectUrl>
+        <RepositoryUrl>https://github.com/marcingolenia/umadb-net-client</RepositoryUrl>
+        <RepositoryType>git</RepositoryType>
+        <!-- Package quality -->
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <Copyright>Copyright (c) 2026 UmaDb .NET Client Contributors</Copyright>
+        <PackageReleaseNotes>See https://github.com/marcingolenia/umadb-net-client/releases</PackageReleaseNotes>
     </PropertyGroup>
-
     <ItemGroup>
       <ProjectReference Include="..\UmaDb.Core\UmaDb.Core.fsproj" />
       <PackageReference Include="protobuf-net.Grpc" />
     </ItemGroup>
-
+    <ItemGroup>
+        <None Include="..\README.md" Pack="true" PackagePath="\"/>
+    </ItemGroup>
 </Project>
