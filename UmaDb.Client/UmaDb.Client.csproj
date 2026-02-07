@@ -7,7 +7,7 @@
         <NoWarn>$(NoWarn);1591</NoWarn>
         <!-- NuGet package identity -->
         <PackageId>UmaDb.Client</PackageId>
-        <Version>1.0.1</Version>
+        <Version>0.1.0</Version>
         <Title>UmaDb .NET Client</Title>
         <Authors>UmaDb .NET Client Contributors</Authors>
         <Company>UmaDb</Company>
