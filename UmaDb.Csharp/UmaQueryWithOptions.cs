@@ -6,28 +6,28 @@ namespace UmaDb.Csharp;
 /// Builds a filter over the event log by event type and tags.
 /// Use with <see cref="UmaClient.ReadAsync"/>, <see cref="UmaClient.ReadListAsync"/>, <see cref="UmaClient.SubscribeAsync"/>, <see cref="UmaClient.SubscribeWithCallback"/>, and append conditions.
 /// </summary>
-public class UmaFilter
+public class UmaQuery
 {
-    internal UmaFilter()
+    internal UmaQuery()
     {
     }
 
     internal List<QueryItem> Items { get; } = [];
 
     /// <summary>Filter that matches all events (no type or tag restriction).</summary>
-    public static UmaFilter All => new();
+    public static UmaQuery All => new();
 
     /// <summary>
     /// Starts a filter: events match if type is in <paramref name="types"/> (or any if null) and tags include all of <paramref name="tags"/> (or any if null).
     /// Chain with <see cref="Or"/> to add alternative criteria (OR).
     /// </summary>
-    public static UmaFilter Where(string[]? types = null, string[]? tags = null) =>
-        new UmaFilter().Or(types, tags);
+    public static UmaQuery Where(string[]? types = null, string[]? tags = null) =>
+        new UmaQuery().Or(types, tags);
 
     /// <summary>
     /// Adds another query item (OR). An event matches the filter if it matches this item or any previous item.
     /// </summary>
-    public UmaFilter Or(string[]? types = null, string[]? tags = null)
+    public UmaQuery Or(string[]? types = null, string[]? tags = null)
     {
         Items.Add(new QueryItem
         {
@@ -38,13 +38,13 @@ public class UmaFilter
     }
 
     /// <summary>
-    /// Configures read options (position, limit, batch size, direction, subscribe) and returns a <see cref="UmaQuery"/> for use with read/subscribe APIs.
+    /// Configures read options (position, limit, batch size, direction, subscribe) and returns a <see cref="UmaQueryWithOptions"/> for use with read/subscribe APIs.
     /// </summary>
-    public UmaQuery WithOptions(Action<UmaQueryOptions>? configure = null)
+    public UmaQueryWithOptions WithOptions(Action<UmaQueryOptions>? configure = null)
     {
         var options = new UmaQueryOptions();
         configure?.Invoke(options);
-        return new UmaQuery(this, options);
+        return new UmaQueryWithOptions(this, options);
     }
 
     internal Query? ToProto()
@@ -71,14 +71,14 @@ public class UmaQueryOptions
 }
 
 /// <summary>
-/// A read request: a filter plus options. Create via <see cref="UmaFilter.WithOptions"/>.
+/// A read request: a query plus options. Create via <see cref="UmaQuery.WithOptions"/>.
 /// </summary>
-/// <param name="filter">The filter (types/tags) to apply.</param>
+/// <param name="query">DCB Query to filter by types and tags.</param>
 /// <param name="options">Read options (position, limit, batch size, backwards, subscribe).</param>
-public class UmaQuery(UmaFilter filter, UmaQueryOptions options)
+public class UmaQueryWithOptions(UmaQuery query, UmaQueryOptions options)
 {
-    /// <summary>The filter used for this read.</summary>
-    public UmaFilter Filter { get; } = filter;
+    /// <summary>The DCB query used for this read.</summary>
+    public UmaQuery Query { get; } = query;
     /// <summary>The read options.</summary>
     public UmaQueryOptions Options { get; } = options;
 }

@@ -30,7 +30,7 @@ public class ReadingAppending
         );
 
         await umaClient.AppendAsync([evt1, evt2], ct: TestContext.Current.CancellationToken);
-        var query = UmaFilter.Where([nameof(OrderCreated)], [$"order-{orderCreated.OrderId}"]).WithOptions(o => o.Limit = 1);
+        var query = UmaQuery.Where([nameof(OrderCreated)], [$"order-{orderCreated.OrderId}"]).WithOptions(o => o.Limit = 1);
         var (events, _) = await umaClient.ReadListAsync(query, TestContext.Current.CancellationToken);
 
         var payload = JsonSerializer.Deserialize<OrderCreated>(events[0].Event.Data.ToArray());
@@ -61,14 +61,14 @@ public class ReadingAppending
     {
         using var umaClient = UmaClient.Connect(new UmaClientOptions().WithHost("localhost").WithPort(50051));
         var tag = $"idem-{Guid.NewGuid()}";
-        var filter = UmaFilter.Where([nameof(OrderCreated)], [tag]);
-        await foreach (var _ in umaClient.ReadAsync(filter.WithOptions(o => { }), TestContext.Current.CancellationToken))
+        var query = UmaQuery.Where([nameof(OrderCreated)], [tag]);
+        await foreach (var _ in umaClient.ReadAsync(query.WithOptions(o => { }), TestContext.Current.CancellationToken))
             { }
         var after = await umaClient.GetHeadAsync(TestContext.Current.CancellationToken);
         var id = Guid.NewGuid();
         var evt = new UmaEvent(nameof(OrderCreated), new ReadOnlyMemory<byte>([1, 2, 3]), [tag], id);
-        var r1 = await umaClient.AppendAsync([evt], failIfMatch: filter, after: after, ct: TestContext.Current.CancellationToken);
-        var r2 = await umaClient.AppendAsync([evt], failIfMatch: filter, after: after, ct: TestContext.Current.CancellationToken);
+        var r1 = await umaClient.AppendAsync([evt], failIfMatch: query, after: after, ct: TestContext.Current.CancellationToken);
+        var r2 = await umaClient.AppendAsync([evt], failIfMatch: query, after: after, ct: TestContext.Current.CancellationToken);
         Assert.Equal(r1.Position, r2.Position);
     }
 
@@ -82,7 +82,7 @@ public class ReadingAppending
             new UmaEvent("B", new ReadOnlyMemory<byte>([2]), [tag]),
             new UmaEvent("C", new ReadOnlyMemory<byte>([3]), [tag]),
         ], ct: TestContext.Current.CancellationToken);
-        var query = UmaFilter.Where(["A", "B", "C"], [tag]).WithOptions(o => { o.Backwards = true; o.Limit = 2; });
+        var query = UmaQuery.Where(["A", "B", "C"], [tag]).WithOptions(o => { o.Backwards = true; o.Limit = 2; });
         var (events, _) = await umaClient.ReadListAsync(query, TestContext.Current.CancellationToken);
         Assert.Equal(2, events.Count);
         Assert.Equal("C", events[0].Event.EventType);
@@ -94,15 +94,15 @@ public class ReadingAppending
     {
         using var umaClient = UmaClient.Connect(new UmaClientOptions().WithHost("localhost").WithPort(50051));
         var tag = $"cb-{Guid.NewGuid()}";
-        var filter = UmaFilter.Where([nameof(OrderCreated)], [tag]);
+        var query = UmaQuery.Where([nameof(OrderCreated)], [tag]);
         var evt1 = new UmaEvent(nameof(OrderCreated), JsonSerializer.SerializeToUtf8Bytes(new OrderCreated(Guid.NewGuid(), 1m)), [tag]);
-        await umaClient.AppendAsync([evt1], failIfMatch: filter, after: null, ct: TestContext.Current.CancellationToken);
-        await foreach (var _ in umaClient.ReadAsync(filter.WithOptions(o => { }), TestContext.Current.CancellationToken))
+        await umaClient.AppendAsync([evt1], failIfMatch: query, after: null, ct: TestContext.Current.CancellationToken);
+        await foreach (var _ in umaClient.ReadAsync(query.WithOptions(o => { }), TestContext.Current.CancellationToken))
             { }
         var after = await umaClient.GetHeadAsync(TestContext.Current.CancellationToken);
         var evt2 = new UmaEvent(nameof(OrderCreated), JsonSerializer.SerializeToUtf8Bytes(new OrderCreated(Guid.NewGuid(), 2m)), [tag]);
-        await umaClient.AppendAsync([evt2], failIfMatch: filter, after: after, ct: TestContext.Current.CancellationToken);
-        var (events, _) = await umaClient.ReadListAsync(filter, TestContext.Current.CancellationToken);
+        await umaClient.AppendAsync([evt2], failIfMatch: query, after: after, ct: TestContext.Current.CancellationToken);
+        var (events, _) = await umaClient.ReadListAsync(query, TestContext.Current.CancellationToken);
         Assert.Equal(2, events.Count);
     }
     
@@ -112,7 +112,7 @@ public class ReadingAppending
         using var umaClient = UmaClient.Connect(new UmaClientOptions().WithHost("localhost").WithPort(50051));
         var evt1 = new OrderCreated(Guid.NewGuid(), 100m);
         var evt2 = new OrderCreated(Guid.NewGuid(), 100m);
-        var filter = UmaFilter.Where(types: [nameof(OrderCreated)], tags: [$"order-{evt1.OrderId}"]);
+        var query = UmaQuery.Where(types: [nameof(OrderCreated)], tags: [$"order-{evt1.OrderId}"]);
         var umaEvt1 = new UmaEvent(
             nameof(OrderCreated),
             JsonSerializer.SerializeToUtf8Bytes(evt1),
@@ -122,10 +122,10 @@ public class ReadingAppending
             JsonSerializer.SerializeToUtf8Bytes(evt2),
             [$"order-{evt2.OrderId}"]);
         
-        await umaClient.AppendAsync(events: [umaEvt1], failIfMatch: filter);
+        await umaClient.AppendAsync(events: [umaEvt1], failIfMatch: query);
         
         var exception = await Assert.ThrowsAsync<UmaDbException.IntegrityException>(
-            () => umaClient.AppendAsync(events: [umaEvt2], failIfMatch: filter).AsTask());
+            () => umaClient.AppendAsync(events: [umaEvt2], failIfMatch: query).AsTask());
         
         Assert.IsAssignableFrom<UmaDbException>(exception);
     }

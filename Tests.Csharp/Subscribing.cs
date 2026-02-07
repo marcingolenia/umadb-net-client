@@ -22,7 +22,7 @@ public class Subscribing
         var ct = TestContext.Current.CancellationToken;
 
         using var subscription = umaClient.SubscribeWithCallback(
-            UmaFilter.Where([nameof(OrderCreated)], [tag]),
+            UmaQuery.Where([nameof(OrderCreated)], [tag]),
             evt => received.TrySetResult(evt),
             ct);
 
@@ -48,7 +48,7 @@ public class Subscribing
         _ = Task.Run(async () =>
         {
             await foreach (var evt in umaClient.SubscribeAsync(
-                UmaFilter.Where([nameof(OrderCreated)], [tag]), ct))
+                UmaQuery.Where([nameof(OrderCreated)], [tag]), ct))
                 received.TrySetResult(evt);
         }, ct);
 
@@ -72,7 +72,7 @@ public class Subscribing
         var ct = TestContext.Current.CancellationToken;
 
         var subscription = umaClient.ReadAsync(
-            UmaFilter.Where([nameof(OrderCreated)], [tag]).WithOptions(o => o.Subscribe = true),
+            UmaQuery.Where([nameof(OrderCreated)], [tag]).WithOptions(o => o.Subscribe = true),
             ct);
 
         _ = Task.Run(async () =>
