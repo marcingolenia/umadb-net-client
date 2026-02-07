@@ -323,5 +323,5 @@ type UmaClient(connection: UmaConnectionResult) =
             [<Optional; DefaultParameterValue(null: string)>] apiKey: string
         ) : UmaClient =
         let opt s = if String.IsNullOrWhiteSpace s then None else Some s
-        let conn = UmaConnection.create host port (opt caCert) (opt apiKey)
+        let conn = UmaConnection.create host port (opt caCert) (opt apiKey) false
         new UmaClient(conn)

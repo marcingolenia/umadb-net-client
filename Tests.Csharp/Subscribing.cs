@@ -10,7 +10,7 @@ public class Subscribing
     [Fact]
     public async Task can_subscribe_to_events()
     {
-        using var umaClient = UmaClient.Connect("localhost", 50051);
+        using var umaClient = UmaClient.Connect(new UmaClientOptions().WithHost("localhost").WithPort(50051));
         var tag = $"subscribe-{Guid.NewGuid()}";
         var orderCreated = new OrderCreated(Guid.NewGuid(), 42m);
         var eventToAppend = new UmaEvent(
@@ -34,7 +34,7 @@ public class Subscribing
     [Fact]
     public async Task can_subscribe_to_events_using_read_async()
     {
-        using var umaClient = UmaClient.Connect("localhost", 50051);
+        using var umaClient = UmaClient.Connect(new UmaClientOptions().WithHost("localhost").WithPort(50051));
         var tag = $"subscribe-{Guid.NewGuid()}";
         var orderCreated = new OrderCreated(Guid.NewGuid(), 99m);
         var eventToAppend = new UmaEvent(

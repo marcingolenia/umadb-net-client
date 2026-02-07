@@ -58,16 +58,13 @@ and private AuthInterceptor(apiKey: string) =
         continuation.Invoke(request, ctx)
 
 module UmaConnection =
-    let create (host: string) (port: int) (caCertPath: string option) (apiKey: string option) : UmaConnectionResult =
+    let create (host: string) (port: int) (caCertPath: string option) (apiKey: string option) (useTls: bool) : UmaConnectionResult =
         if not (nonEmpty host) then invalidArg "host" "Host cannot be empty."
         if not (validPort port) then invalidArg "port" "Port must be between 1 and 65535."
-        match apiKey, caCertPath with
-        | Some _, None -> invalidArg "apiKey" "Security Risk: API Key cannot be sent over unencrypted connections (missing CA Cert)."
-        | _ -> ()
+        let useTls' = useTls || caCertPath.IsSome || apiKey.IsSome
         let address =
-            match caCertPath with
-            | Some _ -> $"https://{host}:{port}"
-            | None -> $"http://{host}:{port}"
+            if useTls' then $"https://{host}:{port}"
+            else $"http://{host}:{port}"
         let handler = new SocketsHttpHandler(
             // Prevents "Stuck" connections if the network drops
             PooledConnectionIdleTimeout = TimeSpan.FromMinutes(2.0),
@@ -81,6 +78,8 @@ module UmaConnection =
                 handler.SslOptions <- SslClientAuthenticationOptions(
                     RemoteCertificateValidationCallback = RemoteCertificateValidationCallback(validateWithCa caCert))
                 Some caCert
+            | None when useTls' ->
+                None
             | None ->
                 handler.SslOptions <- null
                 None

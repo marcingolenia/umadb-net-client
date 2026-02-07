@@ -14,15 +14,67 @@ High-performance .NET client for [UmaDB](https://umadb.io/) via gRPC. Implements
 
 ## Connection
 
+Build options fluently, then connect:
+
 ```csharp
-using UmaDb.Csharp;
+var options = new UmaClientOptions()
+    .WithHost("localhost")
+    .WithPort(50051)
+    .WithApiKey("key")
+    .EnableTls();
 
-// No TLS
-using var client = UmaClient.Connect("localhost", 50051);
-
-// TLS + API key
-using var client = UmaClient.Connect("localhost", 50051, caCert: "certs/ca.pem", apiKey: "your-api-key");
+using var client = UmaClient.Connect(options);
 ```
+
+- **HTTP** (no TLS, no API key)
+
+  ```csharp
+  UmaClient.Connect(new UmaClientOptions()
+      .WithHost("localhost")
+      .WithPort(50051))
+  ```
+
+- **HTTPS, well-known CA** (no auth)
+
+  ```csharp
+  UmaClient.Connect(new UmaClientOptions()
+      .WithHost("db.example.com")
+      .WithPort(443)
+      .EnableTls())
+  ```
+
+- **HTTPS, well-known CA + API key**
+
+  ```csharp
+  UmaClient.Connect(new UmaClientOptions()
+      .WithHost("db.example.com")
+      .WithPort(443)
+      .WithApiKey("your-key"))
+  ```
+
+- **HTTPS, self-signed / custom CA** (no API key)
+
+  ```csharp
+  UmaClient.Connect(new UmaClientOptions()
+      .WithHost("internal.db")
+      .WithPort(443)
+      .WithCaCert("certs/ca.pem"))
+  ```
+
+- **HTTPS, self-signed / custom CA + API key**
+
+  ```csharp
+  UmaClient.Connect(new UmaClientOptions()
+      .WithHost("internal.db")
+      .WithPort(443)
+      .WithCaCert("certs/ca.pem")
+      .WithApiKey("your-key"))
+  ```
+
+**Notes:**
+
+- **API key** — Use only with TLS. If you set an API key, the client uses HTTPS (system trust when no CA path is given).
+- **CA cert** — Only when the server certificate is not in the system trust store (self-signed or private CA). Omit for public CAs (e.g. Let’s Encrypt).
 
 **Reuse one client** for the app lifetime (gRPC channel reuse). See [Managing UmaClient](#managing-umaclient) below.
 
@@ -45,7 +97,7 @@ using UmaDb.Csharp;
 using UmaDb.Csharp.Messages;
 using System.Text.Json;
 
-using var client = UmaClient.Connect("localhost", 50051);
+using var client = UmaClient.Connect(new UmaClientOptions().WithHost("localhost").WithPort(50051));
 
 // Your event (e.g. record)
 public record OrderCreated(Guid OrderId, decimal Amount);
@@ -151,7 +203,7 @@ var r2 = await client.AppendAsync([evt], failIfMatch: filter, after: after);
 One narrative: read → conditional append → conflict → idempotent retry.
 
 ```csharp
-using var client = UmaClient.Connect("localhost", 50051);
+using var client = UmaClient.Connect(new UmaClientOptions().WithHost("localhost").WithPort(50051));
 
 var tag = "order-123";
 var filter = UmaFilter.Where(types: ["OrderCreated", "OrderShipped"], tags: [tag]);
@@ -180,13 +232,17 @@ var pos2 = await client.AppendAsync([evt], failIfMatch: filter, after: after);
 
 | Method | Purpose |
 |--------|--------|
-| `Connect(host, port, caCert?, apiKey?)` | Build client. TLS when `caCert` is set. Reuse instance. |
+| `Connect(UmaClientOptions)` | Create client from options. Reuse the instance; dispose when shutting down. |
 | `AppendAsync(events, failIfMatch?, after?, trackingInfo?, ct)` | Append; returns `AppendResponse.Position`. Throws `IntegrityException` when condition fails. |
 | `ReadListAsync(filter \| query, ct)` | Returns `(Events, Head)` tuple. |
 | `ReadAsync(filter \| query, ct)` | `IAsyncEnumerable<UmaReadBatch>`. Each batch: `Events`, `Head`. |
 | `Subscribe(filter, onEvent, ct)` | Background subscription; returns `IDisposable`. Handle exceptions in `onEvent`. |
 | `GetHeadAsync(ct)` | Last position or `null`. |
 | `GetTrackingInfoAsync(source, ct)` | Last tracked position for source, or `null`. |
+
+### UmaClientOptions
+
+Fluent options for `Connect`. **WithHost**(`string`), **WithPort**(`int`), **WithApiKey**(`string?`), **WithCaCert**(`string?`), **EnableTls**().
 
 ### UmaFilter
 
@@ -233,7 +289,11 @@ builder.Services.Configure<UmaDbOptions>(builder.Configuration.GetSection("UmaDb
 builder.Services.AddSingleton<UmaClient>(sp =>
 {
     var o = sp.GetRequiredService<IOptions<UmaDbOptions>>().Value;
-    return UmaClient.Connect(o.Host, o.Port, o.CaCert, o.ApiKey);
+    return UmaClient.Connect(new UmaClientOptions()
+        .WithHost(o.Host)
+        .WithPort(o.Port)
+        .WithCaCert(o.CaCert)
+        .WithApiKey(o.ApiKey));
 });
 ```
 

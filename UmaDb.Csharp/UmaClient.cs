@@ -9,7 +9,7 @@ namespace UmaDb.Csharp;
 
 /// <summary>
 /// Client for reading and appending events to UmaDB via gRPC.
-/// Create with <see cref="Connect"/>; reuse one instance per process (channel reuse). Implements <see cref="IDisposable"/>.
+/// Create with <see cref="Connect(UmaClientOptions)"/>; reuse one instance per process (channel reuse). Implements <see cref="IDisposable"/>.
 /// </summary>
 public sealed class UmaClient(UmaConnection.UmaConnectionResult connection) : IDisposable
 {
@@ -227,25 +227,27 @@ public sealed class UmaClient(UmaConnection.UmaConnectionResult connection) : ID
         }
     }
 
-    /// <summary>
-    /// Creates and connects a client. Use TLS by passing <paramref name="caCert"/> (path to PEM); optionally set <paramref name="apiKey"/> for authentication.
-    /// Reuse the returned instance for the lifetime of the process; dispose when shutting down.
-    /// </summary>
-    /// <param name="host">Server hostname.</param>
-    /// <param name="port">Server port.</param>
-    /// <param name="caCert">Optional path to CA certificate (PEM). When set, uses TLS.</param>
-    /// <param name="apiKey">Optional API key when server requires authentication.</param>
-    public static UmaClient Connect(
-        string host,
-        int port,
-        string? caCert = null,
-        string? apiKey = null)
+    /// <summary>Creates a client from the given options. Reuse the returned instance; dispose when shutting down.</summary>
+    /// <exception cref="ArgumentException">Host is null or empty.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Port is not between 1 and 65535.</exception>
+    public static UmaClient Connect(UmaClientOptions options)
     {
+        if (options == null)
+            throw new ArgumentNullException(nameof(options));
+        if (string.IsNullOrWhiteSpace(options.Host))
+            throw new ArgumentException("Host cannot be empty.", nameof(options));
+        if (options.Port is < 1 or > 65535)
+            throw new ArgumentOutOfRangeException(nameof(options), options.Port, "Port must be between 1 and 65535.");
+
+        static FSharpOption<string> Opt(string? s) =>
+            string.IsNullOrEmpty(s) ? FSharpOption<string>.None : FSharpOption<string>.Some(s);
+
         var conn = UmaConnection.UmaConnection.create(
-            host,
-            port,
-            caCert is not null ? FSharpOption<string>.Some(caCert) : FSharpOption<string>.None,
-            apiKey is not null ? FSharpOption<string>.Some(apiKey) : FSharpOption<string>.None);
+            options.Host!,
+            options.Port,
+            Opt(options.CaCertPath),
+            Opt(options.ApiKey),
+            options.UseTls);
         return new UmaClient(conn);
     }
 }

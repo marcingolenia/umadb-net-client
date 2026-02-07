@@ -10,7 +10,7 @@ public class RcpExceptionTests
     [Fact]
     public async Task when_storing_non_increasing_tracking_info_then_IntegrityException_is_thrown()
     {
-        using var umaClient = UmaClient.Connect("localhost", 50051);
+        using var umaClient = UmaClient.Connect(new UmaClientOptions().WithHost("localhost").WithPort(50051));
         var trackingInfo = new UmaTrackingInfo($"{Guid.NewGuid()}", 20);
         await umaClient.AppendAsync(events: [], trackingInfo: trackingInfo);
         

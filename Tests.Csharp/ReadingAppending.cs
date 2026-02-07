@@ -15,7 +15,7 @@ public class ReadingAppending
     [Fact]
     public async Task can_append_and_read_list_of_events()
     {
-        using var umaClient = UmaClient.Connect("localhost", 50051);
+        using var umaClient = UmaClient.Connect(new UmaClientOptions().WithHost("localhost").WithPort(50051));
         var orderCreated = new OrderCreated(Guid.NewGuid(), 100.32m);
         var orderShipped = new OrderShipped(Guid.NewGuid(), "123 Main St");
         var evt1 = new UmaEvent(
@@ -42,7 +42,7 @@ public class ReadingAppending
     public async Task can_read_all_events_in_batches()
     {
         //
-        using var umaClient = UmaClient.Connect("localhost", 50051);
+        using var umaClient = UmaClient.Connect(new UmaClientOptions().WithHost("localhost").WithPort(50051));
         var orderCreated = new OrderCreated(Guid.NewGuid(), 100m);
         var evt1 = new UmaEvent(
             nameof(OrderCreated),
@@ -62,7 +62,7 @@ public class ReadingAppending
     [Fact]
     public async Task can_get_head_position()
     {
-        using var umaClient = UmaClient.Connect("localhost", 50051);
+        using var umaClient = UmaClient.Connect(new UmaClientOptions().WithHost("localhost").WithPort(50051));
         var head = await umaClient.GetHeadAsync(TestContext.Current.CancellationToken);
         Assert.NotNull(head);
     }
@@ -70,7 +70,7 @@ public class ReadingAppending
     [Fact]
     public async Task append_returns_commit_position()
     {
-        using var umaClient = UmaClient.Connect("localhost", 50051);
+        using var umaClient = UmaClient.Connect(new UmaClientOptions().WithHost("localhost").WithPort(50051));
         var evt = new UmaEvent(nameof(OrderCreated), ReadOnlyMemory<byte>.Empty, [$"pos-{Guid.NewGuid()}"]);
         var response = await umaClient.AppendAsync([evt], ct: TestContext.Current.CancellationToken);
         Assert.True(response.Position > 0);
@@ -79,7 +79,7 @@ public class ReadingAppending
     [Fact]
     public async Task idempotent_append_with_same_id_returns_same_commit_position()
     {
-        using var umaClient = UmaClient.Connect("localhost", 50051);
+        using var umaClient = UmaClient.Connect(new UmaClientOptions().WithHost("localhost").WithPort(50051));
         var tag = $"idem-{Guid.NewGuid()}";
         var filter = UmaFilter.Where([nameof(OrderCreated)], [tag]);
         long? after = null;
@@ -95,7 +95,7 @@ public class ReadingAppending
     [Fact]
     public async Task can_read_backwards()
     {
-        using var umaClient = UmaClient.Connect("localhost", 50051);
+        using var umaClient = UmaClient.Connect(new UmaClientOptions().WithHost("localhost").WithPort(50051));
         var tag = $"back-{Guid.NewGuid()}";
         await umaClient.AppendAsync([
             new UmaEvent("A", new ReadOnlyMemory<byte>([1]), [tag]),
@@ -112,7 +112,7 @@ public class ReadingAppending
     [Fact]
     public async Task consistency_boundary_read_then_append_with_condition_after_head()
     {
-        using var umaClient = UmaClient.Connect("localhost", 50051);
+        using var umaClient = UmaClient.Connect(new UmaClientOptions().WithHost("localhost").WithPort(50051));
         var tag = $"cb-{Guid.NewGuid()}";
         var filter = UmaFilter.Where([nameof(OrderCreated)], [tag]);
         var evt1 = new UmaEvent(nameof(OrderCreated), JsonSerializer.SerializeToUtf8Bytes(new OrderCreated(Guid.NewGuid(), 1m)), [tag]);
@@ -129,7 +129,7 @@ public class ReadingAppending
     [Fact]
     public async Task when_appending_events_conditionally_and_condition_fails_then_IntegrityException_is_thrown()
     {
-        using var umaClient = UmaClient.Connect("localhost", 50051);
+        using var umaClient = UmaClient.Connect(new UmaClientOptions().WithHost("localhost").WithPort(50051));
         var evt1 = new OrderCreated(Guid.NewGuid(), 100m);
         var evt2 = new OrderCreated(Guid.NewGuid(), 100m);
         var filter = UmaFilter.Where(types: [nameof(OrderCreated)], tags: [$"order-{evt1.OrderId}"]);
