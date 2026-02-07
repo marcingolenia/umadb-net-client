@@ -7,7 +7,7 @@
         <NoWarn>$(NoWarn);1591</NoWarn>
         <!-- NuGet package identity -->
         <PackageId>UmaDb.Client</PackageId>
-        <Version>1.0.0</Version>
+        <Version>1.0.1</Version>
         <Title>UmaDb .NET Client</Title>
         <Authors>UmaDb .NET Client Contributors</Authors>
         <Company>UmaDb</Company>
@@ -20,8 +20,8 @@
         <PackageProjectUrl>https://github.com/marcingolenia/umadb-net-client</PackageProjectUrl>
         <RepositoryUrl>https://github.com/marcingolenia/umadb-net-client</RepositoryUrl>
         <RepositoryType>git</RepositoryType>
-        <!-- Package quality -->
-        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <!-- Package quality (use lowercase readme.md - path in package must match exactly for NuGet.org) -->
+        <PackageReadmeFile>readme.md</PackageReadmeFile>
         <Copyright>Copyright (c) 2026 UmaDb .NET Client Contributors</Copyright>
         <PackageReleaseNotes>See https://github.com/marcingolenia/umadb-net-client/releases</PackageReleaseNotes>
     </PropertyGroup>
@@ -30,7 +30,7 @@
       <PackageReference Include="protobuf-net.Grpc" />
     </ItemGroup>
     <ItemGroup>
-        <!-- README at package root; path must match PackageReadmeFile exactly (see https://devblogs.microsoft.com/dotnet/add-a-readme-to-your-nuget-package/) -->
-        <None Include="..\README.md" Pack="true" PackagePath="README.md"/>
+        <!-- Pack README at package root as readme.md (lowercase) so nuspec path matches ZIP entry for NuGet.org -->
+        <None Include="..\README.md" Pack="true" PackagePath="readme.md"/>
     </ItemGroup>
 </Project>
