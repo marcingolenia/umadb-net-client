@@ -1,4 +1,4 @@
-namespace UmaDb.Csharp.Messages;
+namespace UmaDb.Client.Messages;
 
 internal record UmaReadBatch(
     IReadOnlyList<SequencedUmaEvent> Events,

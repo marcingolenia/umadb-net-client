@@ -16,7 +16,7 @@
         <PackageReference Include="Microsoft.Extensions.Logging.Console" />
     </ItemGroup>
     <ItemGroup>
-      <ProjectReference Include="..\UmaDb.Csharp\UmaDb.Csharp.csproj" />
+      <ProjectReference Include="..\UmaDb.Client\UmaDb.Client.csproj" />
     </ItemGroup>
     <ItemGroup>
       <None Update="certs\server.pem">

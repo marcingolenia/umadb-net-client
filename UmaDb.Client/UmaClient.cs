@@ -3,9 +3,9 @@ using Grpc.Core;
 using Microsoft.FSharp.Core;
 using ProtoBuf.Grpc.Client;
 using UmaDb.Core;
-using UmaDb.Csharp.Messages;
+using UmaDb.Client.Messages;
 
-namespace UmaDb.Csharp;
+namespace UmaDb.Client;
 
 /// <summary>
 /// Client for reading and appending events to UmaDB via gRPC.
@@ -13,6 +13,9 @@ namespace UmaDb.Csharp;
 /// </summary>
 public sealed class UmaClient(UmaConnection.UmaConnectionResult connection) : IDisposable
 {
+    private static readonly List<SequencedUmaEvent> EmptyReadBatchEvents = [];
+    private static readonly List<string> EmptyTags = [];
+
     private readonly UmaConnection.UmaConnectionResult _connection =
         connection ?? throw new ArgumentNullException(nameof(connection));
 
@@ -68,13 +71,29 @@ public sealed class UmaClient(UmaConnection.UmaConnectionResult connection) : ID
     /// <returns>Tuple of (events, head).</returns>
     public async Task<(IReadOnlyList<SequencedUmaEvent> Events, long? Head)> ReadListAsync(UmaQueryWithOptions queryWithOptions, CancellationToken ct = default)
     {
-        var results = new List<SequencedUmaEvent>();
+        UmaReadBatch? firstBatch = null;
+        List<SequencedUmaEvent>? results = null;
         long? head = null;
         await foreach (var batch in ReadBatchesAsync(queryWithOptions, ct).ConfigureAwait(false))
         {
+            if (firstBatch is null)
+            {
+                firstBatch = batch;
+                head = batch.Head;
+                continue;
+            }
+            if (results is null)
+            {
+                results = new List<SequencedUmaEvent>(firstBatch.Events.Count + batch.Events.Count);
+                results.AddRange(firstBatch.Events);
+            }
             results.AddRange(batch.Events);
             head = batch.Head ?? head;
         }
+        if (firstBatch is null)
+            return (EmptyReadBatchEvents, head);
+        if (results is null)
+            return (firstBatch.Events, head);
         return (results, head);
     }
 
@@ -144,6 +163,23 @@ public sealed class UmaClient(UmaConnection.UmaConnectionResult connection) : ID
     public IAsyncEnumerable<SequencedUmaEvent> SubscribeAsync(UmaQuery query, CancellationToken ct = default) =>
         ReadAsync(new UmaQueryWithOptions(query, new UmaQueryOptions { Subscribe = true }), ct);
 
+    private static ReadOnlyMemory<byte> DataOrEmpty(byte[]? data)
+    {
+        if (data == null || data.Length == 0)
+            return ReadOnlyMemory<byte>.Empty;
+        return new ReadOnlyMemory<byte>(data);
+    }
+
+    /// <summary>Returns a list suitable for proto Event.Tags: reuses List when possible to avoid copy.</summary>
+    private static List<string> TagsForProto(IReadOnlyList<string>? tags)
+    {
+        if (tags == null || tags.Count == 0)
+            return EmptyTags;
+        if (tags is List<string> list)
+            return list;
+        return new List<string>(tags);
+    }
+
     private async IAsyncEnumerable<UmaReadBatch> ReadBatchesAsync(
         UmaQueryWithOptions queryWithOptions,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
@@ -156,15 +192,28 @@ public sealed class UmaClient(UmaConnection.UmaConnectionResult connection) : ID
             Limit = (uint?)queryWithOptions.Options.Limit,
             Subscribe = queryWithOptions.Options.Subscribe,
             BatchSize = (uint?)queryWithOptions.Options.BatchSize,
-        }, ct).Select(response => new UmaReadBatch(
-            (response.Events ?? []).Select(e => new SequencedUmaEvent(
-                (long)e.Position,
-                new UmaEvent(
-                    e.Event.EventType,
-                    e.Event.Data ?? [],
-                    e.Event.Tags?.ToArray(),
-                    string.IsNullOrEmpty(e.Event.Uuid) ? null : Guid.TryParse(e.Event.Uuid, out var guid) ? guid : null))).ToList(),
-            response.Head.HasValue ? (long)response.Head.Value : null));
+        }, ct).Select(response =>
+        {
+            var rawEvents = response.Events;
+            var count = rawEvents?.Count ?? 0;
+            if (count == 0)
+                return new UmaReadBatch(EmptyReadBatchEvents, response.Head.HasValue ? (long)response.Head.Value : null);
+
+            var events = new SequencedUmaEvent[count];
+            for (var i = 0; i < count; i++)
+            {
+                var e = rawEvents![i];
+                var ev = e.Event;
+                events[i] = new SequencedUmaEvent(
+                    (long)e.Position,
+                    new UmaEvent(
+                        ev.EventType,
+                        DataOrEmpty(ev.Data),
+                        ev.Tags?.Count > 0 ? ev.Tags : null,
+                        string.IsNullOrEmpty(ev.Uuid) ? null : Guid.TryParse(ev.Uuid, out var guid) ? guid : null));
+            }
+            return new UmaReadBatch(events, response.Head.HasValue ? (long)response.Head.Value : null);
+        });
 
         var enumerator = enumerable.GetAsyncEnumerator(ct);
         await using (enumerator)
@@ -215,15 +264,22 @@ public sealed class UmaClient(UmaConnection.UmaConnectionResult connection) : ID
     {
         try
         {
-            var request = new AppendRequest
+            var eventsList = events is IReadOnlyCollection<UmaEvent> col
+                ? new List<Event>(col.Count)
+                : new List<Event>();
+            foreach (var e in events)
             {
-                Events = [.. events.Select(e => new Event
+                eventsList.Add(new Event
                 {
                     EventType = e.EventType,
-                    Tags = e.Tags?.ToList() ?? [],
-                    Data = e.Data.ToArray(),
+                    Tags = TagsForProto(e.Tags),
+                    Data = e.Data.IsEmpty ? Array.Empty<byte>() : e.Data.ToArray(),
                     Uuid = (e.Id ?? Guid.NewGuid()).ToString()
-                })],
+                });
+            }
+            var request = new AppendRequest
+            {
+                Events = eventsList,
                 Condition = failIfMatch != null
                     ? new AppendCondition
                     {

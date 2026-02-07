@@ -1,6 +1,6 @@
 using UmaDb.Core;
 
-namespace UmaDb.Csharp;
+namespace UmaDb.Client;
 
 /// <summary>
 /// Builds a filter over the event log by event type and tags.
@@ -12,7 +12,8 @@ public class UmaQuery
     {
     }
 
-    internal List<QueryItem> Items { get; } = [];
+    /// <summary>Stored as (types, tags) to avoid allocating List until ToProto (when query is actually used).</summary>
+    internal List<(string[]? Types, string[]? Tags)> Items { get; } = [];
 
     /// <summary>Filter that matches all events (no type or tag restriction).</summary>
     public static UmaQuery All => new();
@@ -29,11 +30,7 @@ public class UmaQuery
     /// </summary>
     public UmaQuery Or(string[]? types = null, string[]? tags = null)
     {
-        Items.Add(new QueryItem
-        {
-            Types = types?.ToList() ?? [],
-            Tags = tags?.ToList() ?? []
-        });
+        Items.Add((types, tags));
         return this;
     }
 
@@ -49,7 +46,19 @@ public class UmaQuery
 
     internal Query? ToProto()
     {
-        return Items.Count == 0 ? null : new Query { Items = Items };
+        if (Items.Count == 0)
+            return null;
+        var protoItems = new List<QueryItem>(Items.Count);
+        for (var i = 0; i < Items.Count; i++)
+        {
+            var (types, tags) = Items[i];
+            protoItems.Add(new QueryItem
+            {
+                Types = types is { Length: > 0 } ? new List<string>(types) : [],
+                Tags = tags is { Length: > 0 } ? new List<string>(tags) : []
+            });
+        }
+        return new Query { Items = protoItems };
     }
 }
 

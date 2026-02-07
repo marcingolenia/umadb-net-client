@@ -1,6 +1,6 @@
 using Grpc.Core;
-using UmaDb.Csharp;
-using UmaDb.Csharp.Messages;
+using UmaDb.Client;
+using UmaDb.Client.Messages;
 using Xunit;
 
 namespace Tests.Csharp;

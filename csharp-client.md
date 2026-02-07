@@ -93,8 +93,8 @@ using var client = UmaClient.Connect(options);
 ### 1. Append and read
 
 ```csharp
-using UmaDb.Csharp;
-using UmaDb.Csharp.Messages;
+using UmaDb.Client;
+using UmaDb.Client.Messages;
 using System.Text.Json;
 
 using var client = UmaClient.Connect(new UmaClientOptions().WithHost("localhost").WithPort(50051));

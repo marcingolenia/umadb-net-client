@@ -1,4 +1,4 @@
-namespace UmaDb.Csharp;
+namespace UmaDb.Client;
 
 /// <summary>Fluent options for connecting to Uma DB. Use with <see cref="UmaClient.Connect(UmaClientOptions)"/>.</summary>
 public sealed class UmaClientOptions

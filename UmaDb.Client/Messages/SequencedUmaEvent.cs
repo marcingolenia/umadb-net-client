@@ -1,4 +1,4 @@
-namespace UmaDb.Csharp.Messages;
+namespace UmaDb.Client.Messages;
 
 /// <summary>
 /// An event read from the log with its server-assigned sequence position.

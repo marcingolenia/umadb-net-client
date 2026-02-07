@@ -1,6 +1,6 @@
 using Grpc.Core;
 
-namespace UmaDb.Csharp;
+namespace UmaDb.Client;
 
 /// <summary>
 /// Base exception class for UmaDb-related errors.

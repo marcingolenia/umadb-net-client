@@ -1,4 +1,4 @@
-namespace UmaDb.Csharp.Messages;
+namespace UmaDb.Client.Messages;
 
 /// <summary>
 /// A single event to append or that was read from the log.
@@ -10,6 +10,6 @@ namespace UmaDb.Csharp.Messages;
 public record UmaEvent(
     string EventType,
     ReadOnlyMemory<byte> Data,
-    string[]? Tags = null,
+    IReadOnlyList<string>? Tags = null,
     Guid? Id = null
 );

@@ -1,5 +1,5 @@
 using System.Security.Cryptography.X509Certificates;
-using UmaDb.Csharp;
+using UmaDb.Client;
 using Xunit;
 
 namespace Tests.Csharp;

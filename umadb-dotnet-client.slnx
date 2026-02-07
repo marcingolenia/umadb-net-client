@@ -1,7 +1,7 @@
-﻿<Solution>
+<Solution>
   <Project Path="Tests.Csharp\Tests.Csharp.csproj" Type="Classic C#" />
   <Project Path="Tests.Fsharp\Tests.Fsharp.fsproj" Type="Classic F#" />
   <Project Path="UmaDb.Core\UmaDb.Core.fsproj" Type="Classic F#" />
-  <Project Path="UmaDb.Csharp\UmaDb.Csharp.csproj" Type="Classic C#" />
+  <Project Path="UmaDb.Client\UmaDb.Client.csproj" Type="Classic C#" />
   <Project Path="UmaDb.Fsharp\UmaDb.Fsharp.fsproj" Type="Classic F#" />
 </Solution>

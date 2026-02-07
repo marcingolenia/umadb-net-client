@@ -1,4 +1,4 @@
-namespace UmaDb.Csharp.Messages;
+namespace UmaDb.Client.Messages;
 
 /// <summary>
 /// Records that an upstream event source has been processed up to a given position.
