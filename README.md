@@ -1,6 +1,6 @@
 # UmaDb .NET Client
 
-A high-performance, low-allocation .NET client for [UmaDB](https://umadb.io/), designed for Dynamic Consistency Boundaries (DCB).
+A high-performance .NET client for [UmaDB](https://umadb.io/), designed for Dynamic Consistency Boundaries (DCB).
 
 **Documentation:** [C# client guide](csharp-client.md) — connection, concepts, recipes (append/read, consistency boundaries, projections, tracking, idempotent append), API reference, and managing client lifetime.
 
