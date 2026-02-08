@@ -17,6 +17,12 @@
     </ItemGroup>
     <ItemGroup>
       <ProjectReference Include="..\UmaDb.Client\UmaDb.Client.csproj" />
+      <!-- Required for types from Client API that are defined in Core (e.g. AppendResponse); Client's ref has PrivateAssets="all" so it doesn't flow -->
+      <ProjectReference Include="..\UmaDb.Core\UmaDb.Core.fsproj" />
+    </ItemGroup>
+    <ItemGroup>
+      <!-- Unify with UmaDb.Core: avoid System.ServiceModel.Primitives 4.x from other test deps -->
+      <PackageReference Include="System.ServiceModel.Primitives" />
     </ItemGroup>
     <ItemGroup>
       <None Update="certs\server.pem">
