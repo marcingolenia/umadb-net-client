@@ -7,7 +7,7 @@
         <NoWarn>$(NoWarn);1591</NoWarn>
         <!-- NuGet package identity -->
         <PackageId>UmaDb.Client</PackageId>
-        <Version>0.1.2</Version>
+        <Version>0.1.3</Version>
         <Title>UmaDb .NET Client</Title>
         <Authors>UmaDb .NET Client Contributors</Authors>
         <Company>UmaDb</Company>
@@ -32,8 +32,10 @@
            PrivateAssets="all" keeps it out of the nuspec. We include its DLL via IncludeReferencedProjectOutput below. -->
       <ProjectReference Include="..\UmaDb.Core\UmaDb.Core.fsproj" PrivateAssets="all" />
       <PackageReference Include="protobuf-net.Grpc" />
-      <!-- UmaDb.Core is F#; consumers need FSharp.Core at runtime -->
+      <!-- UmaDb.Core runtime deps (Core is embedded via _PackageFiles; refs don't flow so we declare them here) -->
       <PackageReference Include="FSharp.Core" />
+      <PackageReference Include="Grpc.Net.Client" />
+      <PackageReference Include="System.Security.Cryptography.Pkcs" />
     </ItemGroup>
     <!-- Include referenced project output in package (SDK equivalent of nuget pack -IncludeReferencedProjects). -->
     <Target Name="IncludeReferencedProjectOutput" AfterTargets="Build" BeforeTargets="GenerateNuspec">
