@@ -7,7 +7,7 @@
         <NoWarn>$(NoWarn);1591</NoWarn>
         <!-- NuGet package identity -->
         <PackageId>UmaDb.Client</PackageId>
-        <Version>0.1.0</Version>
+        <Version>0.1.1</Version>
         <Title>UmaDb .NET Client</Title>
         <Authors>UmaDb .NET Client Contributors</Authors>
         <Company>UmaDb</Company>
@@ -28,9 +28,22 @@
         <PackageReleaseNotes>See https://github.com/marcingolenia/umadb-net-client/releases</PackageReleaseNotes>
     </PropertyGroup>
     <ItemGroup>
-      <ProjectReference Include="..\UmaDb.Core\UmaDb.Core.fsproj" />
+      <!-- SDK-style pack turns ProjectReference into a package dependency; UmaDb.Core is not published to NuGet.
+           PrivateAssets="all" keeps it out of the nuspec. We include its DLL via IncludeReferencedProjectOutput below. -->
+      <ProjectReference Include="..\UmaDb.Core\UmaDb.Core.fsproj" PrivateAssets="all" />
       <PackageReference Include="protobuf-net.Grpc" />
     </ItemGroup>
+    <!-- Include referenced project output in package (SDK equivalent of nuget pack -IncludeReferencedProjects). -->
+    <Target Name="IncludeReferencedProjectOutput" AfterTargets="Build" BeforeTargets="GenerateNuspec">
+      <PropertyGroup>
+        <_CoreDllPath>$(MSBuildProjectDirectory)/../UmaDb.Core/bin/$(Configuration)/$(TargetFramework)/UmaDb.Core.dll</_CoreDllPath>
+      </PropertyGroup>
+      <ItemGroup>
+        <_PackageFiles Include="$(_CoreDllPath)" Condition="Exists('$(_CoreDllPath)')">
+          <PackagePath>lib/$(TargetFramework)/</PackagePath>
+        </_PackageFiles>
+      </ItemGroup>
+    </Target>
     <ItemGroup>
         <!-- Pack README at package root as readme.md (lowercase) so nuspec path matches ZIP entry for NuGet.org -->
         <None Include="..\README.md" Pack="true" PackagePath="readme.md"/>
