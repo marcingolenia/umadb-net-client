@@ -2,9 +2,7 @@ module UmaDb.Fsharp.Client
 
 open System
 open System.Collections.Generic
-open System.Runtime.InteropServices
 open System.Threading
-open System.Runtime.CompilerServices
 open Client.UmaConnection
 open ProtoBuf.Grpc.Client
 open UmaDb.Client
@@ -14,8 +12,6 @@ open Grpc.Core
 open Errors
 open Types
 open Extensions
-
-// ===== UmaClient =====
 
 type UmaClient(connection: UmaConnectionResult) =
     let service = connection.GetCallInvoker().CreateGrpcService<IDcbService>()
@@ -82,9 +78,10 @@ let read (query: Query) (client: UmaClient): IAsyncEnumerable<SequencedUmaEvent>
     readWithOptions query options client
 
 /// Get the head position (last event position).
-let head (client: UmaClient) (ct: CancellationToken): Async<int64 option> =
+let head (client: UmaClient): Async<int64 option> =
     async {
         try
+            let! ct = Async.CancellationToken
             let! response = client.Service.Head({ _unused = Nullable() }, CallContext.op_Implicit ct).ToAsync()
             return
                 if response.Position.HasValue then
@@ -113,7 +110,7 @@ let trackingInfo (source: string) (client: UmaClient) (ct: CancellationToken): A
 let readAll (query: Query) (client: UmaClient): Async<SequencedUmaEvent list * int64 option> =
     async {
         let options = QueryOptions.defaults
-        let! headPos = head client CancellationToken.None
+        let! headPos = head client 
         let mutable events = ResizeArray<SequencedUmaEvent>()
         
         let stream = readWithOptions query options client
