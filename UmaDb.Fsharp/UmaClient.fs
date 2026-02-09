@@ -15,103 +15,29 @@ open Errors
 open Types
 open Extensions
 
-// ===== UmaClient Implementation =====
+// ===== UmaClient =====
 
 type UmaClient(connection: UmaConnectionResult) =
     let service = connection.GetCallInvoker().CreateGrpcService<IDcbService>()
+    member internal _.Service = service
 
     interface IDisposable with
         member _.Dispose() = (connection :> IDisposable).Dispose()
 
-    // Internal implementation methods
-    member internal this.ReadBatchesAsync(query: Query, options: QueryOptions, ct: CancellationToken): IAsyncEnumerable<UmaDb.Core.ReadResponse> =
-        let queryProto = Query.toProto query
-        let request: ReadRequest =
-            { Query = Option.defaultValue Nullable.query queryProto
-              Start = toNullableUInt64 options.FromPosition
-              Backwards = options.Backwards
-              Limit = toNullableUInt32 options.Limit
-              Subscribe = options.Subscribe
-              BatchSize = toNullableUInt32 options.BatchSize }
-
-        service.Read(request, CallContext.op_Implicit ct)
-
-    member internal this.GetHeadInternal([<Optional>] ?ct: CancellationToken): Async<int64 option> =
-        async {
-            let ct = defaultArg ct CancellationToken.None
-            try
-                let! response = service.Head({ _unused = Nullable() }, CallContext.op_Implicit ct).ToAsync()
-                return
-                    if response.Position.HasValue then
-                        Some(int64 (response.Position.GetValueOrDefault()))
-                    else
-                        None
-            with
-            | :? RpcException as ex -> return raise (UmaDbException.ToUmaDbException(ex))
-        }
-
-    member internal this.GetTrackingInfoInternal(source: string, [<Optional>] ?ct: CancellationToken): Async<int64 option> =
-        async {
-            let ct = defaultArg ct CancellationToken.None
-            try
-                let! response = service.GetTrackingInfo({ Source = source }, CallContext.op_Implicit ct).ToAsync()
-                return
-                    if response.Position.HasValue then
-                        Some(int64 (response.Position.GetValueOrDefault()))
-                    else
-                        None
-            with
-            | :? RpcException as ex -> return raise (UmaDbException.ToUmaDbException(ex))
-        }
-
-    member internal this.AppendInternal
-        (
-            events: UmaEvent list,
-            failIfMatch: Query option,
-            after: int64 option,
-            trackingInfo: UmaTrackingInfo option,
-            [<Optional>] ?ct: CancellationToken
-        ): Async<AppendResult> =
-        async {
-            let ct = defaultArg ct CancellationToken.None
-
-            if List.isEmpty events then
-                return IntegrityError "Events list cannot be empty"
-            else
-                try
-                    let condition =
-                        failIfMatch
-                        |> Option.bind Query.toProto
-                        |> Option.map (fun query ->
-                            { FailIfEventsMatch = query
-                              After = toNullableUInt64 after })
-                        |> Option.defaultValue Nullable.appendCondition
-
-                    let trackingInfo' =
-                        trackingInfo
-                        |> Option.map (fun info ->
-                            { TrackingInfo.Source = info.Source
-                              Position = uint64 info.Position })
-                        |> Option.defaultValue Nullable.trackingInfo
-
-                    let request: AppendRequest =
-                        { Events = events |> List.map Conversion.fromUmaEvent |> ResizeArray
-                          Condition = condition
-                          TrackingInfo = trackingInfo' }
-
-                    let! response = service.Append(request, CallContext.op_Implicit ct).ToAsync()
-                    return Success(int64 response.Position)
-                with
-                | :? RpcException as ex ->
-                    let umaEx = UmaDbException.ToUmaDbException(ex)
-                    match umaEx with
-                    | :? IntegrityException -> return IntegrityError umaEx.Message
-                    | _ -> return raise umaEx
-        }
+let private readBatches (service: IDcbService) (query: Query) (options: QueryOptions) (ct: CancellationToken) =
+    let queryProto = Query.toProto query
+    let request: ReadRequest =
+        { Query = Option.defaultValue Nullable.query queryProto
+          Start = toNullableUInt64 options.FromPosition
+          Backwards = options.Backwards
+          Limit = toNullableUInt32 options.Limit
+          Subscribe = options.Subscribe
+          BatchSize = toNullableUInt32 options.BatchSize }
+    service.Read(request, CallContext.op_Implicit ct)
 
 let readWithOptions (query: Query) (options: QueryOptions) (client: UmaClient): IAsyncEnumerable<SequencedUmaEvent> =
     let ct = CancellationToken.None
-    let batches = client.ReadBatchesAsync(query, options, ct)
+    let batches = readBatches client.Service query options ct
     
     { new IAsyncEnumerable<SequencedUmaEvent> with
         member _.GetAsyncEnumerator(cancellationToken) =
@@ -155,11 +81,39 @@ let read (query: Query) (client: UmaClient): IAsyncEnumerable<SequencedUmaEvent>
     let options = QueryOptions.defaults
     readWithOptions query options client
 
+/// Get the head position (last event position).
+let head (client: UmaClient) (ct: CancellationToken): Async<int64 option> =
+    async {
+        try
+            let! response = client.Service.Head({ _unused = Nullable() }, CallContext.op_Implicit ct).ToAsync()
+            return
+                if response.Position.HasValue then
+                    Some(int64 (response.Position.GetValueOrDefault()))
+                else
+                    None
+        with
+        | :? RpcException as ex -> return raise (UmaDbException.ToUmaDbException(ex))
+    }
+
+/// Get tracking info for a source.
+let trackingInfo (source: string) (client: UmaClient) (ct: CancellationToken): Async<int64 option> =
+    async {
+        try
+            let! response = client.Service.GetTrackingInfo({ Source = source }, CallContext.op_Implicit ct).ToAsync()
+            return
+                if response.Position.HasValue then
+                    Some(int64 (response.Position.GetValueOrDefault()))
+                else
+                    None
+        with
+        | :? RpcException as ex -> return raise (UmaDbException.ToUmaDbException(ex))
+    }
+
 /// Read all events matching the query and return as a list with head position.
 let readAll (query: Query) (client: UmaClient): Async<SequencedUmaEvent list * int64 option> =
     async {
         let options = QueryOptions.defaults
-        let! head = client.GetHeadInternal()
+        let! headPos = head client CancellationToken.None
         let mutable events = ResizeArray<SequencedUmaEvent>()
         
         let stream = readWithOptions query options client
@@ -174,7 +128,7 @@ let readAll (query: Query) (client: UmaClient): Async<SequencedUmaEvent list * i
                 else
                     continueLoop <- false
             
-            return (List.ofSeq events, head)
+            return (List.ofSeq events, headPos)
         finally
             let disposeTask = enumerator.DisposeAsync()
             if disposeTask.IsCompletedSuccessfully then
@@ -189,13 +143,7 @@ let subscribe (query: Query) (client: UmaClient): IAsyncEnumerable<SequencedUmaE
     let options = { QueryOptions.defaults with Subscribe = true }
     readWithOptions query options client
 
-/// Get the head position (last event position).
-let head (client: UmaClient): Async<int64 option> = client.GetHeadInternal()
-
-/// Get tracking info for a source.
-let trackingInfo (source: string) (client: UmaClient): Async<int64 option> = client.GetTrackingInfoInternal(source)
-
-// ===== Public API - Appending =====
+// ===== Appending =====
 
 /// Append operation builder for composable append operations.
 type AppendOperation =
@@ -225,6 +173,39 @@ let after (position: int64) (op: AppendOperation): AppendOperation =
 let track (source: string) (position: int64) (op: AppendOperation): AppendOperation =
     { op with TrackingInfo = Some { Source = source; Position = position } }
 
-/// Execute the append operation
-let execute (op: AppendOperation): Async<AppendResult> =
-    op.Client.AppendInternal(op.Events, op.FailIfMatch, op.After, op.TrackingInfo)
+/// Execute the append operation.
+let execute (op: AppendOperation) (ct: CancellationToken): Async<AppendResult> =
+    async {
+        if List.isEmpty op.Events then
+            return IntegrityError "Events list cannot be empty"
+        else
+            try
+                let condition =
+                    op.FailIfMatch
+                    |> Option.bind Query.toProto
+                    |> Option.map (fun q ->
+                        { FailIfEventsMatch = q
+                          After = toNullableUInt64 op.After })
+                    |> Option.defaultValue Nullable.appendCondition
+
+                let trackingInfo' =
+                    op.TrackingInfo
+                    |> Option.map (fun info ->
+                        { TrackingInfo.Source = info.Source
+                          Position = uint64 info.Position })
+                    |> Option.defaultValue Nullable.trackingInfo
+
+                let request: AppendRequest =
+                    { Events = op.Events |> List.map Conversion.fromUmaEvent |> ResizeArray
+                      Condition = condition
+                      TrackingInfo = trackingInfo' }
+
+                let! response = op.Client.Service.Append(request, CallContext.op_Implicit ct).ToAsync()
+                return Success(int64 response.Position)
+            with
+            | :? RpcException as ex ->
+                let umaEx = UmaDbException.ToUmaDbException(ex)
+                match umaEx with
+                | :? IntegrityException -> return IntegrityError umaEx.Message
+                | _ -> return raise umaEx
+    }
