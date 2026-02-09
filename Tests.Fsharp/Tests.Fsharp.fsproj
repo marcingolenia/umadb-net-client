@@ -5,10 +5,7 @@
         <RootNamespace>Tests</RootNamespace>
     </PropertyGroup>
     <ItemGroup>
-        <Compile Include="Operations.fs" />
         <Compile Include="Setup.fs" />
-        <Compile Include="SimpleConnectivity.fs" />
-        <Compile Include="SocketExhautions.fs" />
     </ItemGroup>
     <ItemGroup>
         <PackageReference Include="FsUnit.xUnit" />
@@ -22,5 +19,24 @@
     </ItemGroup>
     <ItemGroup>
       <ProjectReference Include="..\UmaDb.Core\UmaDb.Core.fsproj" />
+      <ProjectReference Include="..\UmaDb.Fsharp\UmaDb.Fsharp.fsproj" />
+    </ItemGroup>
+    <ItemGroup>
+      <None Include="certs\ca-key.pem">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </None>
+      <None Include="certs\ca.pem">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </None>
+      <None Include="certs\server-key.pem">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </None>
+      <None Include="certs\server.pem">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </None>
+      <Compile Include="Core\SimpleConnectivity.fs" />
+      <Compile Include="Core\SocketExhautions.fs" />
+      <Compile Include="Client\Operations.fs" />
+      <Compile Include="Client\Connecting.fs" />
     </ItemGroup>
 </Project>

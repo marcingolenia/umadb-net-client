@@ -1,4 +1,4 @@
-module SimpleConnectivity
+module Core.SimpleConnectivity
 
 open System
 open Grpc.Net.Client

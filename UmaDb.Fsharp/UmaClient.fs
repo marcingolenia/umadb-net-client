@@ -1,135 +1,21 @@
-module UmaDb
+module UmaDb.Fsharp.Client
 
 open System
 open System.Collections.Generic
 open System.Runtime.InteropServices
 open System.Threading
-open System.Threading.Tasks
 open System.Runtime.CompilerServices
 open Client.UmaConnection
 open ProtoBuf.Grpc.Client
+open UmaDb.Client
 open UmaDb.Core
 open ProtoBuf.Grpc
 open Grpc.Core
 open Errors
+open Types
+open Extensions
 
-type UmaEvent =
-    { EventType: string
-      Data: ReadOnlyMemory<byte>
-      Tags: string list option
-      Id: Guid option }
-
-type SequencedUmaEvent =
-    { Position: int64
-      Event: UmaEvent }
-
-type UmaReadBatch =
-    { Events: SequencedUmaEvent list
-      Head: int64 option }
-
-type UmaTrackingInfo =
-    { Source: string
-      Position: int64 }
-
-type FilterItem =
-    { Types: string list
-      Tags: string list }
-
-type UmaFilter = FilterItem list
-
-type ReadOptions =
-    { FromPosition: int64 option
-      Limit: int option
-      BatchSize: int option
-      Backwards: bool
-      Subscribe: bool }
-
-let defaultReadOptions =
-    { FromPosition = None
-      Limit = None
-      BatchSize = None
-      Backwards = false
-      Subscribe = false }
-
-
-module Filter =
-    let all: UmaFilter = []
-
-    let where (types: string list option) (tags: string list option): FilterItem =
-        { Types = defaultArg types []
-          Tags = defaultArg tags [] }
-
-    let or' (item: FilterItem) (filter: UmaFilter): UmaFilter = item :: filter
-
-    let toProto (filter: UmaFilter): Query option =
-        if List.isEmpty filter then
-            None
-        else
-            filter
-            |> List.map (fun item ->
-                { QueryItem.Types = ResizeArray(item.Types)
-                  Tags = ResizeArray(item.Tags) })
-            |> ResizeArray
-            |> fun items -> Some { Query.Items = items }
-
-module Conversion =
-    let toUmaEvent (e: Event): UmaEvent =
-        { EventType = e.EventType
-          Data = ReadOnlyMemory(e.Data)
-          Tags =
-              if e.Tags = null || e.Tags.Count = 0 then
-                  None
-              else
-                  Some(List.ofSeq e.Tags)
-          Id =
-              if String.IsNullOrEmpty e.Uuid then
-                  None
-              else
-                  match Guid.TryParse e.Uuid with
-                  | true, guid -> Some guid
-                  | false, _ -> None }
-
-    let toSequencedUmaEvent (e: SequencedEvent): SequencedUmaEvent =
-        { Position = int64 e.Position
-          Event = toUmaEvent e.Event }
-
-    let toUmaReadBatch (response: ReadResponse): UmaReadBatch =
-        { Events =
-              if response.Events = null then
-                  []
-              else
-                  response.Events |> Seq.map toSequencedUmaEvent |> List.ofSeq
-          Head =
-              if response.Head.HasValue then
-                  Some(int64 response.Head.Value)
-              else
-                  None }
-
-    let fromUmaEvent (e: UmaEvent): Event =
-        { EventType = e.EventType
-          Tags =
-              match e.Tags with
-              | Some tags -> ResizeArray(tags)
-              | None -> ResizeArray()
-          Data =
-              if e.Data.IsEmpty then
-                  Array.empty
-              else
-                  e.Data.ToArray()
-          Uuid =
-              match e.Id with
-              | Some id -> id.ToString()
-              | None -> Guid.NewGuid().ToString() }
-
-let inline toNullableUInt64 (value: int64 option) =
-    match value with
-    | Some v -> Nullable(uint64 v)
-    | None -> Nullable()
-
-let inline toNullableUInt32 (value: int option) =
-    match value with
-    | Some v -> Nullable(uint32 v)
-    | None -> Nullable()
+// ===== UmaClient Implementation =====
 
 type UmaClient(connection: UmaConnectionResult) =
     let service = connection.GetCallInvoker().CreateGrpcService<IDcbService>()
@@ -137,147 +23,55 @@ type UmaClient(connection: UmaConnectionResult) =
     interface IDisposable with
         member _.Dispose() = (connection :> IDisposable).Dispose()
 
-    member this.GetHeadAsync([<Optional>] ?ct: CancellationToken) : Async<int64 option> =
-        async {
-            let ct = defaultArg ct CancellationToken.None
-            try
-                let! response = service.Head({ _unused = Nullable() }, CallContext.op_Implicit ct).AsTask() |> Async.AwaitTask
-                return
-                    if response.Position.HasValue then
-                        Some(int64 response.Position.Value)
-                    else
-                        None
-            with
-            | :? RpcException as ex -> return raise (UmaDbException.ToUmaDbException(ex))
-        }
-
-    member this.GetTrackingInfoAsync(source: string, [<Optional>] ?ct: CancellationToken) : Async<int64 option> =
-        async {
-            let ct = defaultArg ct CancellationToken.None
-            try
-                let! response = service.GetTrackingInfo({ Source = source }, CallContext.op_Implicit ct).AsTask() |> Async.AwaitTask
-                return
-                    if response.Position.HasValue then
-                        Some(int64 response.Position.Value)
-                    else
-                        None
-            with
-            | :? RpcException as ex -> return raise (UmaDbException.ToUmaDbException(ex))
-        }
-
-    member this.ReadListAsync(filter: UmaFilter, [<Optional>] ?ct: CancellationToken) : Async<SequencedUmaEvent list * int64 option> =
-        this.ReadListAsync(filter, defaultReadOptions, ?ct = ct)
-
-    member this.ReadListAsync(filter: UmaFilter, options: ReadOptions, [<Optional>] ?ct: CancellationToken) : Async<SequencedUmaEvent list * int64 option> =
-        async {
-            let ct = defaultArg ct CancellationToken.None
-            let results = ResizeArray<SequencedUmaEvent>()
-            let mutable head = None
-
-            try
-                let enumerable = this.ReadAsync(filter, options, ct)
-                let enumerator = enumerable.GetAsyncEnumerator(ct)
-                try
-                    let mutable hasMore = true
-                    while hasMore do
-                        let! hasValue = enumerator.MoveNextAsync().AsTask() |> Async.AwaitTask
-                        if hasValue then
-                            let batch = enumerator.Current
-                            results.AddRange(batch.Events)
-                            head <- batch.Head |> Option.orElse head
-                        else
-                            hasMore <- false
-                finally
-                    (enumerator :> IAsyncDisposable).DisposeAsync().AsTask() |> Async.AwaitTask |> ignore
-            with
-            | :? RpcException as ex -> return raise (UmaDbException.ToUmaDbException(ex))
-
-            return (List.ofSeq results, head)
-        }
-
-    member this.ReadAsync(filter: UmaFilter, [<Optional>] ?ct: CancellationToken) : IAsyncEnumerable<UmaReadBatch> =
-        this.ReadAsync(filter, defaultReadOptions, ?ct = ct)
-
-    member this.ReadAsync(filter: UmaFilter, options: ReadOptions, [<Optional; EnumeratorCancellation>] ?ct: CancellationToken) : IAsyncEnumerable<UmaReadBatch> =
-        let ct = defaultArg ct CancellationToken.None
-        let query = Filter.toProto filter
-
+    // Internal implementation methods
+    member internal this.ReadBatchesAsync(query: Query, options: QueryOptions, ct: CancellationToken): IAsyncEnumerable<UmaDb.Core.ReadResponse> =
+        let queryProto = Query.toProto query
         let request: ReadRequest =
-            { Query = Option.defaultValue Nullable.query query
+            { Query = Option.defaultValue Nullable.query queryProto
               Start = toNullableUInt64 options.FromPosition
               Backwards = options.Backwards
               Limit = toNullableUInt32 options.Limit
               Subscribe = options.Subscribe
               BatchSize = toNullableUInt32 options.BatchSize }
 
-        let enumerable = service.Read(request, CallContext.op_Implicit ct)
-        let mutable currentBatch = Unchecked.defaultof<UmaReadBatch>
+        service.Read(request, CallContext.op_Implicit ct)
 
-        { new IAsyncEnumerable<UmaReadBatch> with
-            member _.GetAsyncEnumerator(cancellationToken) =
-                let enumerator = enumerable.GetAsyncEnumerator(cancellationToken)
-                { new IAsyncEnumerator<UmaReadBatch> with
-                    member _.MoveNextAsync() =
-                        task {
-                            try
-                                let! hasValue = enumerator.MoveNextAsync()
-                                if hasValue then
-                                    currentBatch <- Conversion.toUmaReadBatch enumerator.Current
-                                    return true
-                                else
-                                    return false
-                            with
-                            | :? RpcException as ex -> return raise (UmaDbException.ToUmaDbException(ex))
-                        }
-                        |> ValueTask<bool>
+    member internal this.GetHeadInternal([<Optional>] ?ct: CancellationToken): Async<int64 option> =
+        async {
+            let ct = defaultArg ct CancellationToken.None
+            try
+                let! response = service.Head({ _unused = Nullable() }, CallContext.op_Implicit ct).ToAsync()
+                return
+                    if response.Position.HasValue then
+                        Some(int64 (response.Position.GetValueOrDefault()))
+                    else
+                        None
+            with
+            | :? RpcException as ex -> return raise (UmaDbException.ToUmaDbException(ex))
+        }
 
-                    member _.Current = currentBatch
+    member internal this.GetTrackingInfoInternal(source: string, [<Optional>] ?ct: CancellationToken): Async<int64 option> =
+        async {
+            let ct = defaultArg ct CancellationToken.None
+            try
+                let! response = service.GetTrackingInfo({ Source = source }, CallContext.op_Implicit ct).ToAsync()
+                return
+                    if response.Position.HasValue then
+                        Some(int64 (response.Position.GetValueOrDefault()))
+                    else
+                        None
+            with
+            | :? RpcException as ex -> return raise (UmaDbException.ToUmaDbException(ex))
+        }
 
-                    member _.DisposeAsync() = enumerator.DisposeAsync() } }
-
-    member this.Subscribe(filter: UmaFilter, onEvent: SequencedUmaEvent -> unit, [<Optional>] ?ct: CancellationToken) : IDisposable =
-        let ct = defaultArg ct CancellationToken.None
-        let stopCts = new CancellationTokenSource()
-        let linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct, stopCts.Token)
-        let token = linkedCts.Token
-
-        let options = { defaultReadOptions with Subscribe = true }
-
-        Async.Start(
-            async {
-                try
-                    let enumerable = this.ReadAsync(filter, options, token)
-                    let enumerator = enumerable.GetAsyncEnumerator(token)
-                    try
-                        let mutable hasMore = true
-                        while hasMore do
-                            let! hasValue = enumerator.MoveNextAsync().AsTask() |> Async.AwaitTask
-                            if hasValue then
-                                for evt in enumerator.Current.Events do
-                                    onEvent evt
-                            else
-                                hasMore <- false
-                    finally
-                        (enumerator :> IAsyncDisposable).DisposeAsync().AsTask() |> Async.AwaitTask |> ignore
-                finally
-                    linkedCts.Dispose()
-            },
-            token
-        )
-
-        { new IDisposable with
-            member _.Dispose() =
-                stopCts.Cancel()
-                stopCts.Dispose() }
-
-    member this.AppendAsync
+    member internal this.AppendInternal
         (
             events: UmaEvent list,
-            [<Optional>] ?failIfMatch: UmaFilter,
-            [<Optional>] ?after: int64,
-            [<Optional>] ?trackingInfo: UmaTrackingInfo,
+            failIfMatch: Query option,
+            after: int64 option,
+            trackingInfo: UmaTrackingInfo option,
             [<Optional>] ?ct: CancellationToken
-        ) : Async<AppendResult> =
+        ): Async<AppendResult> =
         async {
             let ct = defaultArg ct CancellationToken.None
 
@@ -287,7 +81,7 @@ type UmaClient(connection: UmaConnectionResult) =
                 try
                     let condition =
                         failIfMatch
-                        |> Option.bind Filter.toProto
+                        |> Option.bind Query.toProto
                         |> Option.map (fun query ->
                             { FailIfEventsMatch = query
                               After = toNullableUInt64 after })
@@ -305,7 +99,7 @@ type UmaClient(connection: UmaConnectionResult) =
                           Condition = condition
                           TrackingInfo = trackingInfo' }
 
-                    let! response = service.Append(request, CallContext.op_Implicit ct).AsTask() |> Async.AwaitTask
+                    let! response = service.Append(request, CallContext.op_Implicit ct).ToAsync()
                     return Success(int64 response.Position)
                 with
                 | :? RpcException as ex ->
@@ -315,13 +109,122 @@ type UmaClient(connection: UmaConnectionResult) =
                     | _ -> return raise umaEx
         }
 
-    static member Connect
-        (
-            host: string,
-            port: int,
-            [<Optional; DefaultParameterValue(null: string)>] caCert: string,
-            [<Optional; DefaultParameterValue(null: string)>] apiKey: string
-        ) : UmaClient =
-        let opt s = if String.IsNullOrWhiteSpace s then None else Some s
-        let conn = UmaConnection.create host port (opt caCert) (opt apiKey) false
-        new UmaClient(conn)
+let readWithOptions (query: Query) (options: QueryOptions) (client: UmaClient): IAsyncEnumerable<SequencedUmaEvent> =
+    let ct = CancellationToken.None
+    let batches = client.ReadBatchesAsync(query, options, ct)
+    
+    { new IAsyncEnumerable<SequencedUmaEvent> with
+        member _.GetAsyncEnumerator(cancellationToken) =
+            let enumerator = batches.GetAsyncEnumerator(cancellationToken)
+            let mutable currentEvents = ResizeArray<SequencedUmaEvent>()
+            let mutable currentIndex = 0
+            
+            { new IAsyncEnumerator<SequencedUmaEvent> with
+                member _.MoveNextAsync() =
+                    task {
+                        try
+                            // If we have events in current batch, return next one
+                            if currentIndex < currentEvents.Count then
+                                currentIndex <- currentIndex + 1
+                                return true
+                            else
+                                // Get next batch
+                                let! hasMore = enumerator.MoveNextAsync()
+                                if hasMore then
+                                    let batch = enumerator.Current
+                                    currentEvents <- ResizeArray(Conversion.toSequencedUmaEventList batch)
+                                    currentIndex <- 1
+                                    return currentEvents.Count > 0
+                                else
+                                    return false
+                        with
+                        | :? RpcException as ex -> return raise (UmaDbException.ToUmaDbException(ex))
+                    }
+                    |> System.Threading.Tasks.ValueTask<bool>
+
+                member _.Current =
+                    if currentIndex > 0 && currentIndex <= currentEvents.Count then
+                        currentEvents[currentIndex - 1]
+                    else
+                        raise (InvalidOperationException("Enumerator not positioned on valid element"))
+
+                member _.DisposeAsync() = enumerator.DisposeAsync() } }
+
+/// Read events as a stream (IAsyncEnumerable).
+let read (query: Query) (client: UmaClient): IAsyncEnumerable<SequencedUmaEvent> =
+    let options = QueryOptions.defaults
+    readWithOptions query options client
+
+/// Read all events matching the query and return as a list with head position.
+let readAll (query: Query) (client: UmaClient): Async<SequencedUmaEvent list * int64 option> =
+    async {
+        let options = QueryOptions.defaults
+        let! head = client.GetHeadInternal()
+        let mutable events = ResizeArray<SequencedUmaEvent>()
+        
+        let stream = readWithOptions query options client
+        let enumerator = stream.GetAsyncEnumerator(CancellationToken.None)
+        
+        try
+            let mutable continueLoop = true
+            while continueLoop do
+                let! hasMore = enumerator.MoveNextAsync().ToAsync()
+                if hasMore then
+                    events.Add(enumerator.Current)
+                else
+                    continueLoop <- false
+            
+            return (List.ofSeq events, head)
+        finally
+            let disposeTask = enumerator.DisposeAsync()
+            if disposeTask.IsCompletedSuccessfully then
+                ()
+            else
+                let! _ = disposeTask.AsTask() |> Async.AwaitTask
+                ()
+    }
+
+/// Subscribe to events matching the query (keeps stream open for new events).
+let subscribe (query: Query) (client: UmaClient): IAsyncEnumerable<SequencedUmaEvent> =
+    let options = { QueryOptions.defaults with Subscribe = true }
+    readWithOptions query options client
+
+/// Get the head position (last event position).
+let head (client: UmaClient): Async<int64 option> = client.GetHeadInternal()
+
+/// Get tracking info for a source.
+let trackingInfo (source: string) (client: UmaClient): Async<int64 option> = client.GetTrackingInfoInternal(source)
+
+// ===== Public API - Appending =====
+
+/// Append operation builder for composable append operations.
+type AppendOperation =
+    { Client: UmaClient
+      Events: UmaEvent list
+      FailIfMatch: Query option
+      After: int64 option
+      TrackingInfo: UmaTrackingInfo option }
+
+/// Start an append operation.
+let append (events: UmaEvent list) (client: UmaClient): AppendOperation =
+    { Client = client
+      Events = events
+      FailIfMatch = None
+      After = None
+      TrackingInfo = None }
+
+/// Add fail-if-match condition to append operation.
+let failIfMatch (query: Query) (op: AppendOperation): AppendOperation =
+    { op with FailIfMatch = Some query }
+
+/// Add after position condition to append operation.
+let after (position: int64) (op: AppendOperation): AppendOperation =
+    { op with After = Some position }
+
+/// Add tracking info to append operation.
+let track (source: string) (position: int64) (op: AppendOperation): AppendOperation =
+    { op with TrackingInfo = Some { Source = source; Position = position } }
+
+/// Execute the append operation
+let execute (op: AppendOperation): Async<AppendResult> =
+    op.Client.AppendInternal(op.Events, op.FailIfMatch, op.After, op.TrackingInfo)

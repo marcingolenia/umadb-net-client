@@ -12,10 +12,10 @@ public class RcpExceptionTests
     {
         using var umaClient = UmaClient.Connect(new UmaClientOptions().WithHost("localhost").WithPort(50051));
         var trackingInfo = new UmaTrackingInfo($"{Guid.NewGuid()}", 20);
-        await umaClient.AppendAsync(events: [], trackingInfo: trackingInfo);
+        await umaClient.AppendAsync(events: [], trackingInfo: trackingInfo, ct: TestContext.Current.CancellationToken);
         
         var exception = await Assert.ThrowsAsync<UmaDbException.IntegrityException>(
-            () => umaClient.AppendAsync(events: [], trackingInfo: trackingInfo).AsTask());
+            () => umaClient.AppendAsync(events: [], trackingInfo: trackingInfo, ct: TestContext.Current.CancellationToken).AsTask());
         Assert.IsAssignableFrom<UmaDbException>(exception);
     }
 

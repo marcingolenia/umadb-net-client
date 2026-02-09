@@ -122,10 +122,10 @@ public class ReadingAppending
             JsonSerializer.SerializeToUtf8Bytes(evt2),
             [$"order-{evt2.OrderId}"]);
         
-        await umaClient.AppendAsync(events: [umaEvt1], failIfMatch: query);
+        await umaClient.AppendAsync(events: [umaEvt1], failIfMatch: query, ct: TestContext.Current.CancellationToken);
         
         var exception = await Assert.ThrowsAsync<UmaDbException.IntegrityException>(
-            () => umaClient.AppendAsync(events: [umaEvt2], failIfMatch: query).AsTask());
+            () => umaClient.AppendAsync(events: [umaEvt2], failIfMatch: query, ct: TestContext.Current.CancellationToken).AsTask());
         
         Assert.IsAssignableFrom<UmaDbException>(exception);
     }

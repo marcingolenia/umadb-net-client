@@ -153,7 +153,7 @@ public sealed class UmaClient(UmaConnection.UmaConnectionResult connection) : ID
     }
 
     /// <summary>
-    /// Subscribes to events matching the query and yields them as an async stream (like <see cref="ReadAsync"/> but keeps the stream open for new events).
+    /// Subscribes to events matching the query and yields them as an async stream (like <see cref="ReadAsync(UmaQuery, CancellationToken)"/> but keeps the stream open for new events).
     /// Use this when you want to consume events with <c>await foreach</c>. Use <see cref="SubscribeWithCallback"/> when you prefer a callback on a background task.
     /// When the server exposes a dedicated Subscribe RPC, this method will use it (no backwards/limit); until then it uses the read stream with subscribe enabled.
     /// </summary>
@@ -250,7 +250,7 @@ public sealed class UmaClient(UmaConnection.UmaConnectionResult connection) : ID
     /// </summary>
     /// <param name="events">Events to append. Must not be empty.</param>
     /// <param name="failIfMatch">If set, append fails when the log contains any matching event after <paramref name="after"/> (use same query and head from read).</param>
-    /// <param name="after">When used with <paramref name="failIfMatch"/>, only events after this position are considered. Use head from <see cref="ReadListAsync"/> or <see cref="GetHeadAsync"/> after a streamed read.</param>
+    /// <param name="after">When used with <paramref name="failIfMatch"/>, only events after this position are considered. Use head from <see cref="ReadListAsync(UmaQuery, CancellationToken)"/> or <see cref="GetHeadAsync"/> after a streamed read.</param>
     /// <param name="trackingInfo">Optional upstream checkpoint; stored atomically with the events. Positions must increase per source.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Response containing the commit position of the last appended event.</returns>

@@ -1,4 +1,4 @@
-module Tests.SocketExhautions
+module Core.SocketExhautions
 
 open System
 open Xunit

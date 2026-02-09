@@ -10,13 +10,6 @@ namespace Tests.Csharp
 {
     public class Setup : IDisposable
     {
-        const string ENV_UMADB_API_KEY = "UMADB_API_KEY";
-        const string ENV_UMADB_TLS_CERT = "UMADB_TLS_CERT";
-        const string ENV_UMADB_TLS_KEY = "UMADB_TLS_KEY";
-        const string TLS_SECRETS_DIR = "/etc/secrets";
-        const string TLS_CERT_CONTAINER_PATH = "/etc/secrets/server.pem";
-        const string TLS_KEY_CONTAINER_PATH = "/etc/secrets/server-key.pem";
-
         static ILogger CreateLogger()
         {
             var loggerFactory = LoggerFactory.Create(builder =>
@@ -48,11 +41,11 @@ namespace Tests.Csharp
                 .WithName("umadb-tls-secure")
                 .WithLogger(logger)
                 .WithPortBinding(50001, 50051)
-                .WithResourceMapping(new FileInfo("certs/server.pem"), TLS_SECRETS_DIR + "/")
-                .WithResourceMapping(new FileInfo("certs/server-key.pem"), TLS_SECRETS_DIR + "/")
-                .WithEnvironment(ENV_UMADB_TLS_CERT, TLS_CERT_CONTAINER_PATH)
-                .WithEnvironment(ENV_UMADB_TLS_KEY, TLS_KEY_CONTAINER_PATH)
-                .WithEnvironment(ENV_UMADB_API_KEY, "test-api-key")
+                .WithResourceMapping(new FileInfo("certs/server.pem"), "/etc/secrets/")
+                .WithResourceMapping(new FileInfo("certs/server-key.pem"), "/etc/secrets/")
+                .WithEnvironment("UMADB_TLS_CERT", "/etc/secrets/server.pem")
+                .WithEnvironment("UMADB_TLS_KEY", "/etc/secrets/server-key.pem")
+                .WithEnvironment("UMADB_API_KEY", "test-api-key")
                 .WithReuse(true)
                 .Build()
                 .StartAsync().GetAwaiter().GetResult();

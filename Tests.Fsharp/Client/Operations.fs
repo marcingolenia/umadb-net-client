@@ -1,9 +1,7 @@
 module Operations
 
 open System
-open FsUnit.Xunit
 open UmaDb.Core
-open Xunit
 
 let event =
     { EventType = "TestEvent"
