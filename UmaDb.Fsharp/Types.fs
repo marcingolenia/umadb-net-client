@@ -44,29 +44,8 @@ module Types =
           Backwards = false
           Subscribe = false }
 
-    /// Query module for building queries (DCB spec aligned).
+
     module Query =
-        /// Query that matches all events (empty query).
-        let all: Query = []
-
-        /// Create a QueryItem with optional types and tags.
-        /// Types are OR'd together, Tags are AND'd together.
-        let item (types: string list option) (tags: string list option): QueryItem =
-            { Types = defaultArg types []
-              Tags = defaultArg tags [] }
-
-        /// Add a QueryItem to a Query (OR operation).
-        let or' (item: QueryItem) (query: Query): Query = item :: query
-
-        /// Add types to a QueryItem (OR operation).
-        let addTypes (types: string list) (item: QueryItem): QueryItem =
-            { item with Types = item.Types @ types }
-
-        /// Add tags to a QueryItem (AND operation).
-        let addTags (tags: string list) (item: QueryItem): QueryItem =
-            { item with Tags = item.Tags @ tags }
-
-        /// Convert Query to proto format.
         let toProto (query: Query): UmaDb.Core.Query option =
             if List.isEmpty query then
                 None
@@ -142,12 +121,12 @@ module Types =
                   | Some id -> id.ToString()
                   | None -> Guid.NewGuid().ToString() }
 
-        let toSequencedUmaEventList (response: UmaDb.Core.ReadResponse): SequencedUmaEvent list =
+        let toSequencedUmaEventList (response: ReadResponse): SequencedUmaEvent list =
             if response.Events = null || response.Events.Count = 0 then
                 []
             else
                 response.Events
-                |> Seq.map (fun e -> toSequencedUmaEvent e)
+                |> Seq.map toSequencedUmaEvent
                 |> List.ofSeq
 
     let inline toNullableUInt64 (value: int64 option) =

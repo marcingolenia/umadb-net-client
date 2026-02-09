@@ -38,5 +38,6 @@
       <Compile Include="Core\SocketExhautions.fs" />
       <Compile Include="Client\Operations.fs" />
       <Compile Include="Client\Connecting.fs" />
+      <Compile Include="Client\Reading.fs" />
     </ItemGroup>
 </Project>
