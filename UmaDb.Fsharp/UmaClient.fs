@@ -1,12 +1,10 @@
 module UmaDb.Fsharp.Client
 
 open System
-open System.Collections.Generic
 open System.Threading
 open Client.UmaConnection
 open ProtoBuf.Grpc.Client
 open UmaDb.Client
-open UmaDb.Client.Types
 open UmaDb.Core
 open ProtoBuf.Grpc
 open Grpc.Core
@@ -33,7 +31,10 @@ type UmaClient(connection: UmaConnectionResult) =
     interface IDisposable with
         member _.Dispose() = (connection :> IDisposable).Dispose()
     
-let private readInternal (query: QueryItem list) (options: QueryOptions) (client: UmaClient) (ct: CancellationToken) =
+let readWithOptions (query: QueryItem list)
+                    (options: QueryOptions)
+                    (client: UmaClient)
+                    (ct: CancellationToken) =
     taskSeq {
         try
             ct.ThrowIfCancellationRequested()
@@ -44,13 +45,9 @@ let private readInternal (query: QueryItem list) (options: QueryOptions) (client
         with
         | :? RpcException as ex -> raise (UmaDbException.ToUmaDbException(ex))
     }
-
-let readWithOptions (query: QueryItem list) (options: QueryOptions) (client: UmaClient) =
-    async {
-        let! ct = Async.CancellationToken
-        return readInternal query options client ct
-    }
-
+    
+let read (query: QueryItem list) (client: UmaClient) = 
+    readWithOptions query QueryOptions.defaults client CancellationToken.None
 
 let head (client: UmaClient): Async<int64 option> =
     async {
