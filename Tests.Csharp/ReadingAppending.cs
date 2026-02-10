@@ -62,8 +62,7 @@ public class ReadingAppending
         using var umaClient = UmaClient.Connect(new UmaClientOptions().WithHost("localhost").WithPort(50051));
         var tag = $"idem-{Guid.NewGuid()}";
         var query = UmaQuery.Where([nameof(OrderCreated)], [tag]);
-        await foreach (var _ in umaClient.ReadAsync(query.WithOptions(o => { }), TestContext.Current.CancellationToken))
-            { }
+        await foreach (var _ in umaClient.ReadAsync(query.WithOptions(o => { }), TestContext.Current.CancellationToken)) { }
         var after = await umaClient.GetHeadAsync(TestContext.Current.CancellationToken);
         var id = Guid.NewGuid();
         var evt = new UmaEvent(nameof(OrderCreated), new ReadOnlyMemory<byte>([1, 2, 3]), [tag], id);

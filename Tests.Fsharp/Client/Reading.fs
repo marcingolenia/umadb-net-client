@@ -2,6 +2,8 @@ module Tests.Client.Reading
 
 open System
 open System.Threading
+open System.Threading.Tasks
+open FSharp.Control
 open Xunit
 open UmaDb.Fsharp.ConnectionBuilder
 open UmaDb.Fsharp.Client
@@ -16,28 +18,26 @@ let ``Read throws when cancellation is requested before starting`` () =
     let query: Query = []
     let options = QueryOptions.defaults
 
-    let work =
-        async {
-            let! _ = readWithOptions query options cts.Token umaClient
-            ()
-        }
+    let work () =
+        readWithOptions query options umaClient cts.Token
+        |> TaskSeq.iter (fun _ -> ())
+        :> Task
 
-    Assert.Throws<OperationCanceledException>(fun () ->
-        Async.RunSynchronously(work, cancellationToken = cts.Token))
+    Assert.ThrowsAsync<OperationCanceledException>(work)
 
 [<Fact>]
 let ``Read throws when cancelled during stream`` () =
     use umaClient = connect "localhost" 50002 |> build
-    use cts = new CancellationTokenSource()
     let query: Query = []
     let options = QueryOptions.defaults |> QueryOptions.subscribe
 
-    let work =
-        async {
-            let! _ = readWithOptions query options cts.Token umaClient
-            cts.Cancel()
-            ()
+    let work () =
+        task {
+            use ctsInner = new CancellationTokenSource()
+            let seq = readWithOptions query options umaClient ctsInner.Token
+            do! (TaskSeq.iter (fun _ -> ctsInner.Cancel()) seq |> Async.AwaitTask)
         }
+        :> Task
 
-    Assert.Throws<OperationCanceledException>(fun () ->
-        Async.RunSynchronously(work, cancellationToken = cts.Token))
+    Assert.ThrowsAsync<Errors.CancelledException>(work) |> ignore
+

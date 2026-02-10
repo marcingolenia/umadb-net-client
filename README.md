@@ -18,7 +18,16 @@ A high-performance .NET client for [UmaDB](https://umadb.io/), designed for Dyna
 ### ADR 2: Triple-Surface API (The Language Bridge)
 
 * **Decision:** Expose different types for C# and F# through a Core library and an F# Wrapper.
-* **Rationale:** C# surface uses `Task` and explicit `CancellationToken`; F# surface uses `Async<T>` with implicit cancellation. Both sit on the same high-perf engine.
+* **Rationale:** C# surface uses `Task` and explicit `CancellationToken`; F# surface originally used `Async<T>` with implicit cancellation. Both sit on the same high-perf engine.
+
+### ADR 3: F# client uses `task` / `taskSeq` (not `Async<'T>`) as its primary async model
+
+* **Decision:** The public F# client (`UmaDb.Fsharp`) uses F# `task` / `taskSeq` (i.e. .NET `Task` / `IAsyncEnumerable`) as its primary async surface, especially for reads and streaming, rather than wrapping everything in `Async<'T>` / `AsyncSeq`.
+* **Rationale:**
+  - **Direct gRPC alignment:** The generated gRPC stubs expose `Task` and `IAsyncEnumerable<ReadResponse>` with explicit `CancellationToken`. Using `task` / `taskSeq` lets the F# client sit directly on these types without extra adapter layers or duplicate cancellation channels.
+  - **Streaming & cancellation semantics:** Long-lived reads/subscriptions are driven by explicit `CancellationToken`s and gRPC stream lifetime. `taskSeq` keeps this 1:1 with the transport; `Async<'T>` would introduce an additional implicit token (`Async.CancellationToken`) that does not map cleanly to gRPC.
+  - **Performance on hot paths:** UmaDB clients are used in high-throughput consumers and projections. Every conversion between `Task`/`IAsyncEnumerable` and `Async<'T>` / `AsyncSeq` adds state machines, allocations, and potential context switches. Keeping the public surface on `task` / `taskSeq` minimizes overhead in the streaming path.
+  - **F# ergonomics preserved:** F# developers can still opt into `Async<'T>` at their own boundaries (e.g. `Task` → `Async<'T>` via `Async.AwaitTask`, or materializing `taskSeq` to a list), but the core library remains “close to the wire” and does not force that model internally.
 
 ---
 

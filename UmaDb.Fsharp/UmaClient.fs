@@ -2,6 +2,7 @@ module UmaDb.Fsharp.Client
 
 open System
 open System.Threading
+open System.Threading.Tasks
 open Client.UmaConnection
 open ProtoBuf.Grpc.Client
 open UmaDb.Client
@@ -11,7 +12,6 @@ open Grpc.Core
 open FSharp.Control
 open Errors
 open Types
-open Extensions
 
 type UmaClient(connection: UmaConnectionResult) =
     let service = connection.GetCallInvoker().CreateGrpcService<IDcbService>()
@@ -40,7 +40,6 @@ let readWithOptions (query: QueryItem list)
             ct.ThrowIfCancellationRequested()
             let batches = client.ReadBatches query options ct
             for batch in batches do
-                ct.ThrowIfCancellationRequested()
                 yield! Conversion.toSequencedUmaEventList batch
         with
         | :? RpcException as ex -> raise (UmaDbException.ToUmaDbException(ex))
@@ -49,11 +48,10 @@ let readWithOptions (query: QueryItem list)
 let read (query: QueryItem list) (client: UmaClient) = 
     readWithOptions query QueryOptions.defaults client CancellationToken.None
 
-let head (client: UmaClient): Async<int64 option> =
-    async {
+let head (ct: CancellationToken) (client: UmaClient)  =
+    task {
         try
-            let! ct = Async.CancellationToken
-            let! response = client.Service.Head({ _unused = Nullable() }, CallContext.op_Implicit ct).ToAsync()
+            let! response = client.Service.Head({ _unused = Nullable() }, CallContext.op_Implicit ct)
             return
                 if response.Position.HasValue then
                     Some(int64 (response.Position.GetValueOrDefault()))
@@ -63,11 +61,10 @@ let head (client: UmaClient): Async<int64 option> =
         | :? RpcException as ex -> return raise (UmaDbException.ToUmaDbException(ex))
     }
 
-/// Get tracking info for a source.
-let trackingInfo (source: string) (client: UmaClient) (ct: CancellationToken): Async<int64 option> =
-    async {
+let trackingInfo (source: string) (client: UmaClient) (ct: CancellationToken): Task<int64 option> =
+    task {
         try
-            let! response = client.Service.GetTrackingInfo({ Source = source }, CallContext.op_Implicit ct).ToAsync()
+            let! response = client.Service.GetTrackingInfo({ Source = source }, CallContext.op_Implicit ct)
             return
                 if response.Position.HasValue then
                     Some(int64 (response.Position.GetValueOrDefault()))
@@ -110,8 +107,8 @@ let track (source: string) (position: int64) (op: AppendOperation): AppendOperat
     { op with TrackingInfo = Some { Source = source; Position = position } }
 
 /// Execute the append operation.
-let execute (op: AppendOperation) (ct: CancellationToken): Async<AppendResult> =
-    async {
+let execute (op: AppendOperation) (ct: CancellationToken): Task<AppendResult> =
+    task {
         if List.isEmpty op.Events then
             return IntegrityError "Events list cannot be empty"
         else
@@ -136,7 +133,7 @@ let execute (op: AppendOperation) (ct: CancellationToken): Async<AppendResult> =
                       Condition = condition
                       TrackingInfo = trackingInfo' }
 
-                let! response = op.Client.Service.Append(request, CallContext.op_Implicit ct).ToAsync()
+                let! response = op.Client.Service.Append(request, CallContext.op_Implicit ct)
                 return Success(int64 response.Position)
             with
             | :? RpcException as ex ->

@@ -14,6 +14,7 @@ type UmaDbException(message: string, ?innerException: Exception) =
         | StatusCode.DataLoss -> CorruptionException(errorMessage) :> UmaDbException
         | StatusCode.InvalidArgument -> SerializationException(errorMessage) :> UmaDbException
         | StatusCode.Internal -> InternalException(errorMessage) :> UmaDbException
+        | StatusCode.Cancelled -> CancelledException(errorMessage, rpcException) :> UmaDbException
         | _ -> UmaDbException($"gRPC error: {errorMessage}", rpcException)
 
 and IoException(message: string) =
@@ -33,6 +34,9 @@ and InternalException(message: string) =
 
 and AuthenticationException(message: string) =
     inherit UmaDbException(message)
+
+and CancelledException(message: string, ?innerException: Exception) =
+    inherit UmaDbException(message, defaultArg innerException null)
 
 type AppendResult =
     | Success of int64

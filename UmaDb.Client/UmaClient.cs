@@ -177,14 +177,14 @@ public sealed class UmaClient(UmaConnection.UmaConnectionResult connection) : ID
             return EmptyTags;
         if (tags is List<string> list)
             return list;
-        return new List<string>(tags);
+        return [.. tags!];
     }
 
     private async IAsyncEnumerable<UmaReadBatch> ReadBatchesAsync(
         UmaQueryWithOptions queryWithOptions,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
     {
-        var enumerable = _service.Read(new ReadRequest
+        var request = new ReadRequest
         {
             Query = queryWithOptions.Query.ToProto(),
             Start = (ulong?)queryWithOptions.Options.FromPosition,
@@ -192,48 +192,60 @@ public sealed class UmaClient(UmaConnection.UmaConnectionResult connection) : ID
             Limit = (uint?)queryWithOptions.Options.Limit,
             Subscribe = queryWithOptions.Options.Subscribe,
             BatchSize = (uint?)queryWithOptions.Options.BatchSize,
-        }, ct).Select(response =>
-        {
-            var rawEvents = response.Events;
-            var count = rawEvents?.Count ?? 0;
-            if (count == 0)
-                return new UmaReadBatch(EmptyReadBatchEvents, response.Head.HasValue ? (long)response.Head.Value : null);
+        };
 
-            var events = new SequencedUmaEvent[count];
-            for (var i = 0; i < count; i++)
-            {
-                var e = rawEvents![i];
-                var ev = e.Event;
-                events[i] = new SequencedUmaEvent(
-                    (long)e.Position,
-                    new UmaEvent(
-                        ev.EventType,
-                        DataOrEmpty(ev.Data),
-                        ev.Tags?.Count > 0 ? ev.Tags : null,
-                        string.IsNullOrEmpty(ev.Uuid) ? null : Guid.TryParse(ev.Uuid, out var guid) ? guid : null));
-            }
-            return new UmaReadBatch(events, response.Head.HasValue ? (long)response.Head.Value : null);
-        });
+        var stream = _service.Read(request, ct);
+        await using var enumerator = stream.GetAsyncEnumerator(ct);
 
-        var enumerator = enumerable.GetAsyncEnumerator(ct);
-        await using (enumerator)
+        while (true)
         {
-            while (true)
+            ReadResponse response;
+            try
             {
-                UmaReadBatch current;
-                try
-                {
-                    if (!await enumerator.MoveNextAsync())
-                        break;
-                    current = enumerator.Current;
-                }
-                catch (RpcException ex)
-                {
-                    throw UmaDbException.ToUmaDbException(ex);
-                }
-                yield return current;
+                if (!await enumerator.MoveNextAsync().ConfigureAwait(false))
+                    yield break;
+
+                response = enumerator.Current;
             }
+            catch (RpcException ex)
+            {
+                throw UmaDbException.ToUmaDbException(ex);
+            }
+
+            yield return MapToBatch(response);
         }
+    }
+
+    private static UmaReadBatch MapToBatch(ReadResponse response)
+    {
+        var rawEvents = response.Events;
+        var count = rawEvents?.Count ?? 0;
+
+        if (count == 0)
+        {
+            return new UmaReadBatch(
+                EmptyReadBatchEvents,
+                response.Head.HasValue ? (long)response.Head.Value : null);
+        }
+
+        var events = new SequencedUmaEvent[count];
+        for (var i = 0; i < count; i++)
+        {
+            var e = rawEvents![i];
+            var ev = e.Event;
+            events[i] = new SequencedUmaEvent(
+                (long)e.Position,
+                new UmaEvent(
+                    ev.EventType,
+                    DataOrEmpty(ev.Data),
+                    ev.Tags?.Count > 0 ? ev.Tags : null,
+                    string.IsNullOrEmpty(ev.Uuid) ? null :
+                        Guid.TryParse(ev.Uuid, out var guid) ? guid : (Guid?)null));
+        }
+
+        return new UmaReadBatch(
+            events,
+            response.Head.HasValue ? (long)response.Head.Value : null);
     }
 
     private sealed class SubscriptionHandle(CancellationTokenSource cts) : IDisposable

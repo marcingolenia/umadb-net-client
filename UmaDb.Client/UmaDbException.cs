@@ -24,6 +24,7 @@ public class UmaDbException : Exception
             StatusCode.DataLoss => new CorruptionException(errorMessage),
             StatusCode.InvalidArgument => new SerializationException(errorMessage),
             StatusCode.Internal => new InternalException(errorMessage),
+            StatusCode.Cancelled => new CancelledException(errorMessage, rpcException),
             _ => new UmaDbException($"gRPC error: {errorMessage}", rpcException)
         };
     }
@@ -74,5 +75,15 @@ public class UmaDbException : Exception
     public sealed class AuthenticationException : UmaDbException
     {
         public AuthenticationException(string message) : base(message) { }
+    }
+
+    /// <summary>
+    /// Raised when a gRPC call is cancelled (e.g. <see cref="System.Threading.CancellationToken"/> cancelled during a stream).
+    /// </summary>
+    public sealed class CancelledException : UmaDbException
+    {
+        public CancelledException(string message) : base(message) { }
+
+        public CancelledException(string message, Exception innerException) : base(message, innerException) { }
     }
 }
