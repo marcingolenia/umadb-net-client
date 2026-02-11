@@ -129,3 +129,70 @@ let ``idempotent append with same id returns same commit position`` () =
         appendResponse1 |> should equal appendResponse2
     }
 
+[<Fact>]
+let ``can get head position`` () =
+    task {
+        use uma = connect "localhost" 50002 |> build
+        let! head = readHead CancellationToken.None uma
+        head |> Option.isSome |> should be True
+    }
+
+[<Fact>]
+let ``append returns commit position`` () =
+    task {
+        use uma = connect "localhost" 50002 |> build
+        let tag = $"pos-{Guid.NewGuid()}"
+        let evt = { EventType = "OrderCreated"
+                    Data = ReadOnlyMemory Array.empty
+                    Tags = Some [tag]
+                    Id = None }
+        let! response = appendOperation [evt] |> append uma CancellationToken.None
+        match response with
+        | Ok position -> position |> should be (greaterThan 0L)
+        | Error err -> failwith (err.ToString())
+    }
+
+[<Fact>]
+let ``can read backwards`` () =
+    task {
+        use uma = connect "localhost" 50002 |> build
+        let tag = $"back-{Guid.NewGuid()}"
+        let events =
+            [ { EventType = "A"; Data = ReadOnlyMemory [|1uy|]; Tags = Some [tag]; Id = None }
+              { EventType = "B"; Data = ReadOnlyMemory [|2uy|]; Tags = Some [tag]; Id = None }
+              { EventType = "C"; Data = ReadOnlyMemory [|3uy|]; Tags = Some [tag]; Id = None } ]
+        let! _ = appendOperation events |> append uma CancellationToken.None
+        let query = [{ Tags = [tag]; Types = ["A"; "B"; "C"] }]
+        let options = QueryOptions.defaults |> QueryOptions.backwards |> QueryOptions.limit 2
+        let! eventsRead =
+            readWithOptions query options uma CancellationToken.None
+            |> TaskSeq.toListAsync
+        eventsRead.Length |> should equal 2
+        eventsRead[0].Event.EventType |> should equal "C"
+        eventsRead[1].Event.EventType |> should equal "B"
+    }
+
+[<Fact>]
+let ``consistency boundary read then append with condition after head`` () =
+    task {
+        use uma = connect "localhost" 50002 |> build
+        let tag = $"cb-{Guid.NewGuid()}"
+        let evtType = "OrderCreated"
+        let query: Query = [{ Tags = [tag]; Types = [evtType] }]
+        let evt1 = { EventType = evtType
+                     Data = ReadOnlyMemory(Encoding.UTF8.GetBytes """{"OrderId":"00000000-0000-0000-0000-000000000001","Amount":1}""")
+                     Tags = Some [tag]
+                     Id = None }
+        let! _ = appendOperation [evt1] |> failIfMatch query |> append uma CancellationToken.None
+        do! readWithOptions query QueryOptions.defaults uma CancellationToken.None
+            |> TaskSeq.iter (fun _ -> ())
+        let! after = readHead CancellationToken.None uma
+        let evt2 = { EventType = evtType
+                     Data = ReadOnlyMemory(Encoding.UTF8.GetBytes """{"OrderId":"00000000-0000-0000-0000-000000000002","Amount":2}""")
+                     Tags = Some [tag]
+                     Id = None }
+        let! _ = appendOperation [evt2] |> failIfMatch query |> withAfter after |> append uma CancellationToken.None
+        let! events, _ = readList uma query
+        events.Length |> should equal 2
+    }
+
