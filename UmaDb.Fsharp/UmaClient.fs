@@ -55,7 +55,7 @@ let readList (client: UmaClient) (query: QueryItem list): Task<SequencedUmaEvent
         return events, head
     }
 
-let head (ct: CancellationToken) (client: UmaClient)  =
+let readHead (ct: CancellationToken) (client: UmaClient)  =
     task {
         try
             let! response = client.Service.Head({ _unused = Nullable() }, CallContext.op_Implicit ct)
@@ -97,13 +97,9 @@ let appendOperation (events: UmaEvent list): AppendOperation =
 let failIfMatch (query: Query) (op: AppendOperation): AppendOperation =
     { op with FailIfMatch = Some query }
 
-/// Add after-position condition to append operation.
-let after (position: int64) (op: AppendOperation): AppendOperation =
-    { op with After = Some position }
-
 /// Add after-position from read when present; when None, leaves condition omitted (DCB: omit = no events ignored).
 let withAfter (position: int64 option) (op: AppendOperation): AppendOperation =
-    match position with Some p -> after p op | None -> op
+    match position with Some p -> { op with After = Some p } | None -> op
 
 /// Add tracking info to append operation.
 let track (source: string) (position: int64) (op: AppendOperation): AppendOperation =
