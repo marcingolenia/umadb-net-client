@@ -55,7 +55,7 @@ let readList (client: UmaClient) (query: QueryItem list): Task<SequencedUmaEvent
         return events, head
     }
 
-let readHead (ct: CancellationToken) (client: UmaClient)  =
+let readHead (client: UmaClient) (ct: CancellationToken)   =
     task {
         try
             let! response = client.Service.Head({ _unused = Nullable() }, CallContext.op_Implicit ct)
@@ -68,7 +68,7 @@ let readHead (ct: CancellationToken) (client: UmaClient)  =
         | :? RpcException as ex -> return raise (UmaDbException.ToUmaDbException(ex))
     }
 
-let trackingInfo (source: string) (client: UmaClient) (ct: CancellationToken): Task<int64 option> =
+let trackingInfo (client: UmaClient) (ct: CancellationToken) (source: string): Task<int64 option> =
     task {
         try
             let! response = client.Service.GetTrackingInfo({ Source = source }, CallContext.op_Implicit ct)

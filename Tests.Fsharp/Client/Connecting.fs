@@ -26,7 +26,7 @@ let ``Connect throws on invalid port`` () =
 let ``can create uma client to http server`` () =
     task {
         use umaClient = connect "localhost" 50002 |> build
-        let! _ = readHead TestContext.Current.CancellationToken umaClient
+        let! _ = readHead umaClient TestContext.Current.CancellationToken
         ()
     }
 
@@ -35,7 +35,7 @@ let ``cannot_connect_with_tls_to_http_only_server`` () =
     (fun () ->
         task {
             use client = connect "localhost" 50002 |> withTls |> build
-            let! _ = readHead TestContext.Current.CancellationToken client
+            let! _ = readHead client TestContext.Current.CancellationToken
             ()
         }
         :> Task)
@@ -46,7 +46,7 @@ let ``cannot connect with api key to http only server`` () =
     (fun () ->
         task {
             use umaClient = connect "localhost" 50002 |> withApiKey "key" |> build
-            let! _ = readHead TestContext.Current.CancellationToken umaClient
+            let! _ = readHead umaClient TestContext.Current.CancellationToken
             ()
         }
         :> Task)
@@ -58,7 +58,7 @@ let ``cannot create uma client without tls if server requires tls`` () =
         let work () =
             task {
                 use umaClient = connect "localhost" 50003 |> build
-                let! _ = readHead TestContext.Current.CancellationToken umaClient
+                let! _ = readHead umaClient TestContext.Current.CancellationToken
                 ()
             }
             :> Task
@@ -72,7 +72,7 @@ let ``cannot create uma client without apikey if server requires tls with apikey
         let work () =
             task {
                 use umaClient = connect "localhost" 50003 |> withCaCert "certs/ca.pem" |> build
-                let! _ = readHead TestContext.Current.CancellationToken umaClient
+                let! _ = readHead umaClient TestContext.Current.CancellationToken
                 ()
             }
             :> Task
@@ -86,7 +86,7 @@ let ``cannot create uma client with wrong apikey`` () =
         let work () =
             task {
                 use umaClient = connect "localhost" 50003 |> withCaCert "certs/ca.pem" |> withApiKey "wrong-api-key" |> build
-                let! _ = readHead TestContext.Current.CancellationToken umaClient
+                let! _ = readHead umaClient TestContext.Current.CancellationToken
                 ()
             }
             :> Task
@@ -98,7 +98,7 @@ let ``cannot create uma client with wrong apikey`` () =
 let ``can create uma client to tls server with api key`` () =
     task {
         use umaClient = connect "localhost" 50003 |> withCaCert "certs/ca.pem" |> withApiKey "test-api-key" |> build
-        let! _ = readHead CancellationToken.None umaClient
+        let! _ = readHead umaClient CancellationToken.None
         ()
     }
 
@@ -115,7 +115,7 @@ let ``can connect with well known ca and api key`` () =
         store.Add caCert
         try
             use umaClient = connect "localhost" 50003 |> withTls |> withApiKey "test-api-key" |> build
-            let! _ = readHead CancellationToken.None umaClient
+            let! _ = readHead umaClient CancellationToken.None
             ()
         finally
             store.Remove(caCert)

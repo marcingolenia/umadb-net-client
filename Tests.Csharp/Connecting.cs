@@ -39,15 +39,19 @@ public class Connecting
     [Fact]
     public async Task cannot_connect_with_tls_to_http_only_server()
     {
-        using var umaClient = UmaClient.Connect(new UmaClientOptions().WithHost("localhost").WithPort(50051).EnableTls());
-        await Assert.ThrowsAnyAsync<UmaDbException>(() => umaClient.GetHeadAsync(TestContext.Current.CancellationToken).AsTask());
+        using var umaClient =
+            UmaClient.Connect(new UmaClientOptions().WithHost("localhost").WithPort(50051).EnableTls());
+        await Assert.ThrowsAnyAsync<UmaDbException>(() =>
+            umaClient.GetHeadAsync(TestContext.Current.CancellationToken).AsTask());
     }
 
     [Fact]
     public async Task cannot_connect_with_api_key_to_http_only_server()
     {
-        using var umaClient = UmaClient.Connect(new UmaClientOptions().WithHost("localhost").WithPort(50051).WithApiKey("key"));
-        await Assert.ThrowsAnyAsync<UmaDbException>(() => umaClient.GetHeadAsync(TestContext.Current.CancellationToken).AsTask());
+        using var umaClient =
+            UmaClient.Connect(new UmaClientOptions().WithHost("localhost").WithPort(50051).WithApiKey("key"));
+        await Assert.ThrowsAnyAsync<UmaDbException>(() =>
+            umaClient.GetHeadAsync(TestContext.Current.CancellationToken).AsTask());
     }
 
     [Fact]
@@ -55,26 +59,31 @@ public class Connecting
     {
         using var umaClient = UmaClient.Connect(new UmaClientOptions().WithHost("localhost").WithPort(50001));
 
-        var exception = await Assert.ThrowsAsync<UmaDbException>(() => umaClient.GetHeadAsync(TestContext.Current.CancellationToken).AsTask());
+        var exception = await Assert.ThrowsAsync<UmaDbException>(() =>
+            umaClient.GetHeadAsync(TestContext.Current.CancellationToken).AsTask());
         Assert.IsType<UmaDbException>(exception);
     }
-    
+
     [Fact]
     public async Task cannot_create_uma_client_without_apikey_if_server_requires_tls_with_apikey()
     {
-        using var umaClient = UmaClient.Connect(new UmaClientOptions().WithHost("localhost").WithPort(50001).WithCaCert("certs/ca.pem"));
+        using var umaClient =
+            UmaClient.Connect(new UmaClientOptions().WithHost("localhost").WithPort(50001).WithCaCert("certs/ca.pem"));
 
-        var exception = await Assert.ThrowsAsync<UmaDbException.AuthenticationException>(() => umaClient.GetHeadAsync(TestContext.Current.CancellationToken).AsTask());
+        var exception = await Assert.ThrowsAsync<UmaDbException.AuthenticationException>(() =>
+            umaClient.GetHeadAsync(TestContext.Current.CancellationToken).AsTask());
         Assert.IsType<UmaDbException.AuthenticationException>(exception);
         Assert.Equal("Authentication error: missing or invalid API key", exception.Message);
     }
-    
+
     [Fact]
     public async Task cannot_create_uma_client_with_wrong_apikey()
     {
-        using var umaClient = UmaClient.Connect(new UmaClientOptions().WithHost("localhost").WithPort(50001).WithCaCert("certs/ca.pem").WithApiKey("wrong-api-key"));
+        using var umaClient = UmaClient.Connect(new UmaClientOptions().WithHost("localhost").WithPort(50001)
+            .WithCaCert("certs/ca.pem").WithApiKey("wrong-api-key"));
 
-        var exception = await Assert.ThrowsAsync<UmaDbException.AuthenticationException>(() => umaClient.GetHeadAsync(TestContext.Current.CancellationToken).AsTask());
+        var exception = await Assert.ThrowsAsync<UmaDbException.AuthenticationException>(() =>
+            umaClient.GetHeadAsync(TestContext.Current.CancellationToken).AsTask());
         Assert.IsType<UmaDbException.AuthenticationException>(exception);
         Assert.Equal("Authentication error: missing or invalid API key", exception.Message);
     }
@@ -82,7 +91,8 @@ public class Connecting
     [Fact]
     public async Task can_create_uma_client_to_tls_server_with_api_key()
     {
-        using var umaClient = UmaClient.Connect(new UmaClientOptions().WithHost("localhost").WithPort(50001).WithCaCert("certs/ca.pem").WithApiKey("test-api-key"));
+        using var umaClient = UmaClient.Connect(new UmaClientOptions().WithHost("localhost").WithPort(50001)
+            .WithCaCert("certs/ca.pem").WithApiKey("test-api-key"));
         await umaClient.GetHeadAsync(TestContext.Current.CancellationToken);
     }
 

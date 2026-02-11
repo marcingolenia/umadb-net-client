@@ -133,7 +133,7 @@ let ``idempotent append with same id returns same commit position`` () =
 let ``can get head position`` () =
     task {
         use uma = connect "localhost" 50002 |> build
-        let! head = readHead CancellationToken.None uma
+        let! head = readHead uma CancellationToken.None
         head |> Option.isSome |> should be True
     }
 
@@ -186,7 +186,7 @@ let ``consistency boundary read then append with condition after head`` () =
         let! _ = appendOperation [evt1] |> failIfMatch query |> append uma CancellationToken.None
         do! readWithOptions query QueryOptions.defaults uma CancellationToken.None
             |> TaskSeq.iter (fun _ -> ())
-        let! after = readHead CancellationToken.None uma
+        let! after = readHead uma CancellationToken.None
         let evt2 = { EventType = evtType
                      Data = ReadOnlyMemory(Encoding.UTF8.GetBytes """{"OrderId":"00000000-0000-0000-0000-000000000002","Amount":2}""")
                      Tags = Some [tag]
