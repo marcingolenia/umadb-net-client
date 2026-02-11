@@ -45,8 +45,15 @@ let readWithOptions (query: QueryItem list)
         | :? RpcException as ex -> raise (UmaDbException.ToUmaDbException(ex))
     }
     
-let read (query: QueryItem list) (client: UmaClient) = 
-    readWithOptions query QueryOptions.defaults client CancellationToken.None
+/// Returns (events, position of last event). When there are no events, position is None (omit <c>after</c> per DCB).
+let readList (client: UmaClient) (query: QueryItem list): Task<SequencedUmaEvent list * int64 option> =
+    task {
+        let! events =
+            readWithOptions query QueryOptions.defaults client CancellationToken.None
+            |> TaskSeq.toListAsync
+        let head = events |> List.tryLast |> Option.map (fun e -> e.Position)
+        return events, head
+    }
 
 let head (ct: CancellationToken) (client: UmaClient)  =
     task {
@@ -74,22 +81,14 @@ let trackingInfo (source: string) (client: UmaClient) (ct: CancellationToken): T
         | :? RpcException as ex -> return raise (UmaDbException.ToUmaDbException(ex))
     }
 
-
-
-// ===== Appending =====
-
-/// Append operation builder for composable append operations.
 type AppendOperation =
-    { Client: UmaClient
-      Events: UmaEvent list
+    { Events: UmaEvent list
       FailIfMatch: Query option
       After: int64 option
       TrackingInfo: UmaTrackingInfo option }
 
-/// Start an append operation.
-let append (events: UmaEvent list) (client: UmaClient): AppendOperation =
-    { Client = client
-      Events = events
+let appendOperation (events: UmaEvent list): AppendOperation =
+    { Events = events
       FailIfMatch = None
       After = None
       TrackingInfo = None }
@@ -98,47 +97,47 @@ let append (events: UmaEvent list) (client: UmaClient): AppendOperation =
 let failIfMatch (query: Query) (op: AppendOperation): AppendOperation =
     { op with FailIfMatch = Some query }
 
-/// Add after position condition to append operation.
+/// Add after-position condition to append operation.
 let after (position: int64) (op: AppendOperation): AppendOperation =
     { op with After = Some position }
+
+/// Add after-position from read when present; when None, leaves condition omitted (DCB: omit = no events ignored).
+let withAfter (position: int64 option) (op: AppendOperation): AppendOperation =
+    match position with Some p -> after p op | None -> op
 
 /// Add tracking info to append operation.
 let track (source: string) (position: int64) (op: AppendOperation): AppendOperation =
     { op with TrackingInfo = Some { Source = source; Position = position } }
 
-/// Execute the append operation.
-let execute (op: AppendOperation) (ct: CancellationToken): Task<AppendResult> =
+
+let append (client: UmaClient) (ct: CancellationToken) (op: AppendOperation) : Task<Result<int64, IntegrityError>> =
     task {
-        if List.isEmpty op.Events then
-            return IntegrityError "Events list cannot be empty"
-        else
-            try
-                let condition =
-                    op.FailIfMatch
-                    |> Option.bind Query.toProto
-                    |> Option.map (fun q ->
-                        { FailIfEventsMatch = q
-                          After = toNullableUInt64 op.After })
-                    |> Option.defaultValue Nullable.appendCondition
+        let condition =
+            match op.FailIfMatch |> Option.bind Query.toProto with
+            | None when Option.isNone op.After -> Nullable.appendCondition
+            | q ->
+                { FailIfEventsMatch = Option.defaultValue Nullable.query q
+                  After = toNullableUInt64 op.After }
 
-                let trackingInfo' =
-                    op.TrackingInfo
-                    |> Option.map (fun info ->
-                        { TrackingInfo.Source = info.Source
-                          Position = uint64 info.Position })
-                    |> Option.defaultValue Nullable.trackingInfo
+        let trackingInfo =
+            match op.TrackingInfo with
+            | None -> Nullable.trackingInfo
+            | Some info -> { 
+                TrackingInfo.Source = info.Source; 
+                Position = uint64 info.Position }
 
-                let request: AppendRequest =
-                    { Events = op.Events |> List.map Conversion.fromUmaEvent |> ResizeArray
-                      Condition = condition
-                      TrackingInfo = trackingInfo' }
+        let request: AppendRequest =
+            { Events = op.Events |> List.map Conversion.fromUmaEvent |> ResizeArray
+              Condition = condition
+              TrackingInfo = trackingInfo }
 
-                let! response = op.Client.Service.Append(request, CallContext.op_Implicit ct)
-                return Success(int64 response.Position)
-            with
-            | :? RpcException as ex ->
-                let umaEx = UmaDbException.ToUmaDbException(ex)
-                match umaEx with
-                | :? IntegrityException -> return IntegrityError umaEx.Message
-                | _ -> return raise umaEx
+        try
+            let! response = client.Service.Append(request, CallContext.op_Implicit ct)
+            return Ok(int64 response.Position)
+        with
+        | :? RpcException as ex ->
+            let umaEx = UmaDbException.ToUmaDbException(ex)
+            match umaEx with
+            | :? IntegrityException -> return Error (ErrorMessage umaEx.Message)
+            | _ -> return raise umaEx
     }

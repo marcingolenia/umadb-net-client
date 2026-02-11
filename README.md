@@ -17,8 +17,8 @@ A high-performance .NET client for [UmaDB](https://umadb.io/), designed for Dyna
 
 ### ADR 2: Triple-Surface API (The Language Bridge)
 
-* **Decision:** Expose different types for C# and F# through a Core library and an F# Wrapper.
-* **Rationale:** C# surface uses `Task` and explicit `CancellationToken`; F# surface originally used `Async<T>` with implicit cancellation. Both sit on the same high-perf engine.
+* **Decision:** Expose different types for C# and F# through a Core library and an Wrappers.
+* **Rationale:** C# and F# idiomatic code differs, thus different clients (wrappers) can align better to each idiom. Both sit on the same high-perf engine.
 
 ### ADR 3: F# client uses `task` / `taskSeq` (not `Async<'T>`) as its primary async model
 

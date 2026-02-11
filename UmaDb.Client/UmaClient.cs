@@ -71,30 +71,11 @@ public sealed class UmaClient(UmaConnection.UmaConnectionResult connection) : ID
     /// <returns>Tuple of (events, head).</returns>
     public async Task<(IReadOnlyList<SequencedUmaEvent> Events, long? Head)> ReadListAsync(UmaQueryWithOptions queryWithOptions, CancellationToken ct = default)
     {
-        UmaReadBatch? firstBatch = null;
-        List<SequencedUmaEvent>? results = null;
-        long? head = null;
+        var results = new List<SequencedUmaEvent>();
         await foreach (var batch in ReadBatchesAsync(queryWithOptions, ct).ConfigureAwait(false))
-        {
-            if (firstBatch is null)
-            {
-                firstBatch = batch;
-                head = batch.Head;
-                continue;
-            }
-            if (results is null)
-            {
-                results = new List<SequencedUmaEvent>(firstBatch.Events.Count + batch.Events.Count);
-                results.AddRange(firstBatch.Events);
-            }
             results.AddRange(batch.Events);
-            head = batch.Head ?? head;
-        }
-        if (firstBatch is null)
-            return (EmptyReadBatchEvents, head);
-        if (results is null)
-            return (firstBatch.Events, head);
-        return (results, head);
+        var head = results.Count > 0 ? results[^1].Position : (long?)null;
+        return (results.Count == 0 ? EmptyReadBatchEvents : results, head);
     }
 
     /// <summary>Streams events one by one. Use for large result sets or when you need incremental processing. Set <see cref="UmaQueryOptions.Subscribe"/> to keep the stream open for new events.</summary>

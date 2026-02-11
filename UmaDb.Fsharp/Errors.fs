@@ -37,7 +37,5 @@ and AuthenticationException(message: string) =
 
 and CancelledException(message: string, ?innerException: Exception) =
     inherit UmaDbException(message, defaultArg innerException null)
-
-type AppendResult =
-    | Success of int64
-    | IntegrityError of string
+    
+type IntegrityError = ErrorMessage of string
