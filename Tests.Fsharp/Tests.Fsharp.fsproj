@@ -39,5 +39,6 @@
       <Compile Include="Client\Operations.fs" />
       <Compile Include="Client\Connecting.fs" />
       <Compile Include="Client\Reading.fs" />
+      <Compile Include="Client\TrackingInfo.fs" />
     </ItemGroup>
 </Project>

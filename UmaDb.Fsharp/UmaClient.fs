@@ -68,7 +68,7 @@ let readHead (client: UmaClient) (ct: CancellationToken)   =
         | :? RpcException as ex -> return raise (UmaDbException.ToUmaDbException(ex))
     }
 
-let trackingInfo (client: UmaClient) (ct: CancellationToken) (source: string): Task<int64 option> =
+let readTrackingInfo (client: UmaClient) (ct: CancellationToken) (source: string): Task<int64 option> =
     task {
         try
             let! response = client.Service.GetTrackingInfo({ Source = source }, CallContext.op_Implicit ct)
