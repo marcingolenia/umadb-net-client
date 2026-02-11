@@ -40,5 +40,6 @@
       <Compile Include="Client\Connecting.fs" />
       <Compile Include="Client\Reading.fs" />
       <Compile Include="Client\TrackingInfo.fs" />
+      <Compile Include="Client\RcpException.fs" />
     </ItemGroup>
 </Project>
