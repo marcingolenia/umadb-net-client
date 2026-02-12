@@ -1,3 +1,5 @@
+/// <summary>F# client for reading and appending events to UmaDB via gRPC (DCB-compliant).</summary>
+/// <remarks>Create with <c>connect host port |> build</c> (or <c>withTls</c> / <c>withApiKey</c>). Reuse one instance per process; implement <c>IDisposable</c> and dispose when shutting down.</remarks>
 module UmaDb.Fsharp.Client
 
 open System
@@ -13,6 +15,7 @@ open FSharp.Control
 open Errors
 open Types
 
+/// <summary>Client instance for a single UmaDB connection. Dispose when no longer needed.</summary>
 type UmaClient(connection: UmaConnectionResult) =
     let service = connection.GetCallInvoker().CreateGrpcService<IDcbService>()
     member internal _.Service = service
@@ -30,7 +33,14 @@ type UmaClient(connection: UmaConnectionResult) =
 
     interface IDisposable with
         member _.Dispose() = (connection :> IDisposable).Dispose()
-    
+
+/// <summary>Streams Sequenced Events matching the query (DCB read). Use for large result sets or incremental processing.</summary>
+/// <param name="client">The UmaDB client.</param>
+/// <param name="ct">Cancellation token.</param>
+/// <param name="query">DCB Query: filter by Event Type and/or Tags (Query Items are OR'd).</param>
+/// <param name="options">Read options (position, limit, batch size, backwards, subscribe). Use <c>QueryOptions.defaults</c> or pipe <c>QueryOptions.subscribe</c> for a live stream.</param>
+/// <returns>TaskSeq of <c>SequencedUmaEvent</c> (batch boundaries are internal).</returns>
+/// <remarks>See <see href="https://dcb.events/specification/">DCB Specification – Reading Events</see>.</remarks>
 let readWithOptions (client: UmaClient)
                     (ct: CancellationToken)
                     (query: QueryItem list)
@@ -46,7 +56,10 @@ let readWithOptions (client: UmaClient)
         | :? RpcException as ex -> raise (UmaDbException.ToUmaDbException(ex))
     }
     
-/// Returns (events, position of last event). When there are no events, position is None (omit <c>after</c> per DCB).
+/// <summary>Reads all events matching the query and returns them plus the head position. Use for small result sets or when building a decision model.</summary>
+/// <param name="client">The UmaDB client.</param>
+/// <param name="query">DCB Query to filter by types and tags.</param>
+/// <returns>Task of (events, head). When there are no events, head is <c>None</c> (omit <c>after</c> in append conditions per DCB). Use head as <c>withAfter</c> in conditional appends.</returns>
 let readList (client: UmaClient) (query: QueryItem list): Task<SequencedUmaEvent list * int64 option> =
     task {
         let! events =
@@ -56,6 +69,10 @@ let readList (client: UmaClient) (query: QueryItem list): Task<SequencedUmaEvent
         return events, head
     }
 
+/// <summary>Returns the Sequence Position of the last event in the log, or <c>None</c> if the log is empty (DCB Sequence Position).</summary>
+/// <param name="client">The UmaDB client.</param>
+/// <param name="ct">Cancellation token.</param>
+/// <returns>Task of optional position.</returns>
 let readHead (client: UmaClient) (ct: CancellationToken) =
     task {
         try
@@ -69,6 +86,11 @@ let readHead (client: UmaClient) (ct: CancellationToken) =
         | :? RpcException as ex -> return raise (UmaDbException.ToUmaDbException(ex))
     }
 
+/// <summary>Returns the last recorded position for the given upstream source, or <c>None</c> if not found. Used for exactly-once ingestion from external streams.</summary>
+/// <param name="client">The UmaDB client.</param>
+/// <param name="ct">Cancellation token.</param>
+/// <param name="source">Upstream source name (e.g. stream or topic).</param>
+/// <returns>Task of optional position.</returns>
 let readTrackingInfo (client: UmaClient) (ct: CancellationToken) (source: string): Task<int64 option> =
     task {
         try
@@ -82,31 +104,51 @@ let readTrackingInfo (client: UmaClient) (ct: CancellationToken) (source: string
         | :? RpcException as ex -> return raise (UmaDbException.ToUmaDbException(ex))
     }
 
+/// <summary>Describes an append operation: events plus optional Append Condition and tracking (DCB append).</summary>
+/// <remarks>Build with <c>appendOperation</c>, then pipe <c>failIfMatch</c>, <c>withAfter</c>, <c>track</c> as needed. Pass to <c>append</c>.</remarks>
 type AppendOperation =
     { Events: UmaEvent list
       FailIfMatch: Query option
       After: int64 option
       TrackingInfo: UmaTrackingInfo option }
 
+/// <summary>Starts building an append operation. Events are appended atomically (DCB: append MUST be atomic).</summary>
+/// <param name="events">Events to append. Must not be empty.</param>
+/// <returns>An <c>AppendOperation</c> with no condition; use <c>failIfMatch</c> / <c>withAfter</c> / <c>track</c> then <c>append</c>.</returns>
 let appendOperation (events: UmaEvent list): AppendOperation =
     { Events = events
       FailIfMatch = None
       After = None
       TrackingInfo = None }
 
-/// Add fail-if-match condition to append operation.
+/// <summary>Adds an Append Condition: append fails if the store contains any event matching the query (DCB failIfEventsMatch).</summary>
+/// <param name="query">Same query used when building the decision model; typically combined with <c>withAfter</c> for optimistic concurrency.</param>
+/// <param name="op">The append operation to update.</param>
+/// <returns>Updated operation. Use with <c>withAfter</c> so only events after that position are considered.</returns>
 let failIfMatch (query: Query) (op: AppendOperation): AppendOperation =
     { op with FailIfMatch = Some query }
 
-/// Add after-position from read when present; when None, leaves condition omitted (DCB: omit = no events ignored).
+/// <summary>Sets the <c>after</c> Sequence Position for the Append Condition (DCB after). Events before this position are ignored when checking failIfEventsMatch.</summary>
+/// <param name="position">Usually the head from <c>readList</c> or <c>readHead</c>. <c>None</c> omits the field (no events ignored; append fails if any event matches).</param>
+/// <param name="op">The append operation to update.</param>
+/// <returns>Updated operation.</returns>
 let withAfter (position: int64 option) (op: AppendOperation): AppendOperation =
     match position with Some p -> { op with After = Some p } | None -> op
 
-/// Add tracking info to append operation.
+/// <summary>Adds upstream tracking info: position is stored atomically with the events. Positions must increase per source (exactly-once ingestion).</summary>
+/// <param name="source">Upstream source name.</param>
+/// <param name="position">Position to record for that source.</param>
+/// <param name="op">The append operation to update.</param>
+/// <returns>Updated operation.</returns>
 let track (source: string) (position: int64) (op: AppendOperation): AppendOperation =
     { op with TrackingInfo = Some { Source = source; Position = position } }
 
 
+/// <summary>Appends the events from the operation atomically. Optionally enforces the Append Condition and/or records tracking info.</summary>
+/// <param name="client">The UmaDB client.</param>
+/// <param name="ct">Cancellation token.</param>
+/// <param name="op">Operation built with <c>appendOperation</c>, <c>failIfMatch</c>, <c>withAfter</c>, <c>track</c>.</param>
+/// <returns>Task of <c>Ok position</c> (commit position of last appended event) or <c>Error (ErrorMessage _)</c> when the append condition fails or tracking position is not strictly increasing.</returns>
 let append (client: UmaClient) (ct: CancellationToken) (op: AppendOperation) : Task<Result<int64, IntegrityError>> =
     task {
         let condition =
@@ -140,13 +182,17 @@ let append (client: UmaClient) (ct: CancellationToken) (op: AppendOperation) : T
     }
 
 
-/// Subscription handle; dispose to stop the subscription.
+/// <summary>Handle for an active subscription. Dispose to stop the subscription.</summary>
 type SubscriptionHandle(cts: CancellationTokenSource) =
     interface IDisposable with
         member _.Dispose() = cts.Cancel(); cts.Dispose()
 
-/// Streams events matching the query as they become available (subscription), invoking the async callback for each event sequentially.
-/// Disposing the returned handle or cancelling <c>ct</c> stops the subscription. Handle exceptions inside <c>onEvent</c>.
+/// <summary>Streams events matching the query as they become available (subscription), invoking the async callback for each event sequentially. Use for projections that need async work (e.g. DB writes).</summary>
+/// <param name="client">The UmaDB client.</param>
+/// <param name="ct">When cancelled, the subscription stops.</param>
+/// <param name="query">DCB Query to filter by types and tags.</param>
+/// <param name="onEvent">Async callback for each Sequenced Event. Should be idempotent when building projections. Receives the linked cancellation token.</param>
+/// <returns>Disposable that stops the subscription when disposed (e.g. <c>use _ = subscribeWithCallback ...</c>). Exceptions in the stream or in <c>onEvent</c> are not thrown to the caller—handle them inside <c>onEvent</c>.</returns>
 let subscribeWithCallback (client: UmaClient) (ct: CancellationToken) (query: QueryItem list) (onEvent: SequencedUmaEvent * CancellationToken -> Task) : IDisposable =
     let stopCts = new CancellationTokenSource()
     let linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct, stopCts.Token)
