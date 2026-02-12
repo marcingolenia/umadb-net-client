@@ -2,6 +2,22 @@
     <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <NoWarn>$(NoWarn);1591</NoWarn>
+        <PackageId>UmaDb.Client.Fsharp</PackageId>
+        <Version>0.0.1</Version>
+        <Title>UmaDb .NET Client (F#)</Title>
+        <Authors>UmaDb .NET Client Contributors</Authors>
+        <Company>UmaDb</Company>
+        <Description>F# client for UmaDB with pipeline-friendly API, task computation expressions, and DCB support.</Description>
+        <PackageTags>umadb;grpc;event-sourcing;dcb;</PackageTags>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <PackageProjectUrl>https://github.com/marcingolenia/umadb-net-client</PackageProjectUrl>
+        <RepositoryUrl>https://github.com/marcingolenia/umadb-net-client</RepositoryUrl>
+        <RepositoryType>git</RepositoryType>
+        <PackageIcon>logo.png</PackageIcon>
+        <PackageReadmeFile>readme.md</PackageReadmeFile>
+        <Copyright>Copyright (c) 2026 UmaDb .NET Client Contributors</Copyright>
+        <PackageReleaseNotes>See https://github.com/marcingolenia/umadb-net-client/releases</PackageReleaseNotes>
     </PropertyGroup>
     <ItemGroup>
         <Compile Include="Errors.fs" />
@@ -11,11 +27,28 @@
         <Compile Include="ConnectionBuilder.fs" />
     </ItemGroup>
     <ItemGroup>
-      <ProjectReference Include="..\UmaDb.Core\UmaDb.Core.fsproj" />
+      <ProjectReference Include="..\UmaDb.Core\UmaDb.Core.fsproj" PrivateAssets="all" />
     </ItemGroup>
     <ItemGroup>
       <PackageReference Include="FSharp.Control.TaskSeq" />
       <PackageReference Include="FSharp.Core" />
+      <PackageReference Include="Grpc.Net.Client" />
       <PackageReference Include="IcedTasks" />
+      <PackageReference Include="protobuf-net.Grpc" />
+      <PackageReference Include="System.Security.Cryptography.Pkcs" />
+    </ItemGroup>
+    <Target Name="IncludeReferencedProjectOutput" AfterTargets="Build" BeforeTargets="GenerateNuspec">
+      <PropertyGroup>
+        <_CoreDllPath>$(MSBuildProjectDirectory)/../UmaDb.Core/bin/$(Configuration)/$(TargetFramework)/UmaDb.Core.dll</_CoreDllPath>
+      </PropertyGroup>
+      <ItemGroup>
+        <_PackageFiles Include="$(_CoreDllPath)" Condition="Exists('$(_CoreDllPath)')">
+          <PackagePath>lib/$(TargetFramework)/</PackagePath>
+        </_PackageFiles>
+      </ItemGroup>
+    </Target>
+    <ItemGroup>
+        <None Include="..\README.md" Pack="true" PackagePath="readme.md"/>
+        <None Include="..\logo.png" Pack="true" PackagePath="logo.png"/>
     </ItemGroup>
 </Project>

@@ -84,6 +84,8 @@ use client = connect "localhost" 50051 |> withApiKey "key" |> withTls |> build
 
 ## Recipes
 
+Snippets assume they run inside a `task { }` and that a `CancellationToken` is in scope (e.g. `let ct = CancellationToken.None` or from the request) where used.
+
 ### 1. Append and read
 
 ```fsharp

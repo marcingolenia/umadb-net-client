@@ -23,8 +23,10 @@ jobs:
         run: dotnet build --no-restore
       - name: Test
         run: dotnet test
-      - name: Pack Nuget
-        run: dotnet pack UmaDb.Client/UmaDb.Client.csproj -c Release -o nuget
+      - name: Pack NuGet
+        run: |
+          dotnet pack UmaDb.Client/UmaDb.Client.csproj -c Release -o nuget
+          dotnet pack UmaDb.Fsharp/UmaDb.Fsharp.fsproj -c Release -o nuget
 
       # NuGet Trusted Publishing: exchange GitHub OIDC token for short-lived API key
       - name: NuGet login (OIDC → temp API key)
