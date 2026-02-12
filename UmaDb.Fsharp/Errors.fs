@@ -1,4 +1,4 @@
-module Errors
+module UmaDb.Fsharp.Errors
 
 open System
 open Grpc.Core

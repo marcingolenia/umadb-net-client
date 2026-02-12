@@ -7,7 +7,6 @@ open System.Threading
 open System.Threading.Tasks
 open Client.UmaConnection
 open ProtoBuf.Grpc.Client
-open UmaDb.Client
 open UmaDb.Core
 open ProtoBuf.Grpc
 open Grpc.Core

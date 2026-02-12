@@ -4,7 +4,7 @@
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
         <NoWarn>$(NoWarn);1591</NoWarn>
         <PackageId>UmaDb.Client.Fsharp</PackageId>
-        <Version>0.0.1</Version>
+        <Version>0.0.2</Version>
         <Title>UmaDb .NET Client (F#)</Title>
         <Authors>UmaDb .NET Client Contributors</Authors>
         <Company>UmaDb</Company>
@@ -22,7 +22,6 @@
     <ItemGroup>
         <Compile Include="Errors.fs" />
         <Compile Include="Types.fs" />
-        <Compile Include="Extensions.fs" />
         <Compile Include="UmaClient.fs" />
         <Compile Include="ConnectionBuilder.fs" />
     </ItemGroup>
@@ -33,7 +32,6 @@
       <PackageReference Include="FSharp.Control.TaskSeq" />
       <PackageReference Include="FSharp.Core" />
       <PackageReference Include="Grpc.Net.Client" />
-      <PackageReference Include="IcedTasks" />
       <PackageReference Include="protobuf-net.Grpc" />
       <PackageReference Include="System.Security.Cryptography.Pkcs" />
     </ItemGroup>
