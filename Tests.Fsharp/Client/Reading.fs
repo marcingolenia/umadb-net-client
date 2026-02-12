@@ -21,7 +21,7 @@ let ``Read throws when cancellation is requested before starting`` () =
     let options = QueryOptions.defaults
 
     let work () =
-        readWithOptions query options umaClient cts.Token
+        readWithOptions umaClient cts.Token query options
         |> TaskSeq.iter (fun _ -> ())
         :> Task
 
@@ -36,7 +36,7 @@ let ``Read throws when cancelled during stream`` () =
     let work () =
         task {
             use ctsInner = new CancellationTokenSource()
-            let seq = readWithOptions query options umaClient ctsInner.Token
+            let seq = readWithOptions umaClient ctsInner.Token query options
             do! (TaskSeq.iter (fun _ -> ctsInner.Cancel()) seq |> Async.AwaitTask)
         }
         :> Task
@@ -165,7 +165,7 @@ let ``can read backwards`` () =
         let query = [{ Tags = [tag]; Types = ["A"; "B"; "C"] }]
         let options = QueryOptions.defaults |> QueryOptions.backwards |> QueryOptions.limit 2
         let! eventsRead =
-            readWithOptions query options uma CancellationToken.None
+            readWithOptions uma CancellationToken.None query options
             |> TaskSeq.toListAsync
         eventsRead.Length |> should equal 2
         eventsRead[0].Event.EventType |> should equal "C"
@@ -184,7 +184,7 @@ let ``consistency boundary read then append with condition after head`` () =
                      Tags = Some [tag]
                      Id = None }
         let! _ = appendOperation [evt1] |> failIfMatch query |> append uma CancellationToken.None
-        do! readWithOptions query QueryOptions.defaults uma CancellationToken.None
+        do! readWithOptions uma CancellationToken.None query QueryOptions.defaults
             |> TaskSeq.iter (fun _ -> ())
         let! after = readHead uma CancellationToken.None
         let evt2 = { EventType = evtType

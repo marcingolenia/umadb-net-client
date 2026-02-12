@@ -166,7 +166,7 @@ public class OrderProjectionService : BackgroundService
     {
         using var sub = _client.SubscribeWithCallback(
             UmaQuery.Where(types: [nameof(OrderCreated), nameof(OrderShipped)]),
-            evt => _store.Upsert(evt),  // idempotent
+            (evt, ct) => _store.UpsertAsync(evt, ct),  // idempotent; events processed sequentially
             stoppingToken
         );
         await Task.Delay(Timeout.Infinite, stoppingToken);
@@ -248,7 +248,7 @@ var pos2 = await client.AppendAsync([evt], failIfMatch: query, after: after);
 | `ReadListAsync(query \| queryWithOptions, ct)` | Returns `(Events, Head)` tuple. |
 | `ReadAsync(query \| queryWithOptions, ct)` | `IAsyncEnumerable<SequencedUmaEvent>`. Stream of events (batching is internal). |
 | `SubscribeAsync(query, ct)` | `IAsyncEnumerable<SequencedUmaEvent>`. Subscription stream; use `await foreach` to consume. |
-| `SubscribeWithCallback(query, onEvent, ct)` | Background subscription; invokes `onEvent` for each event; returns `IDisposable`. Handle exceptions in `onEvent`. |
+| `SubscribeWithCallback(query, onEvent, ct)` | Background subscription; invokes async `onEvent(evt, ct)` for each event (sequential); returns `IDisposable`. Handle exceptions in `onEvent`. |
 | `GetHeadAsync(ct)` | Last position or `null`. |
 | `GetTrackingInfoAsync(source, ct)` | Last tracked position for source, or `null`. |
 

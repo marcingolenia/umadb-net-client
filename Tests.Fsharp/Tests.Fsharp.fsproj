@@ -41,5 +41,6 @@
       <Compile Include="Client\Reading.fs" />
       <Compile Include="Client\TrackingInfo.fs" />
       <Compile Include="Client\RcpException.fs" />
+      <Compile Include="Client\Subscribing.fs" />
     </ItemGroup>
 </Project>

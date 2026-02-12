@@ -23,7 +23,7 @@ public class Subscribing
 
         using var subscription = umaClient.SubscribeWithCallback(
             UmaQuery.Where([nameof(OrderCreated)], [tag]),
-            evt => received.TrySetResult(evt),
+            (evt, _) => { received.TrySetResult(evt); return Task.CompletedTask; },
             ct);
 
         await umaClient.AppendAsync([eventToAppend], ct: ct);

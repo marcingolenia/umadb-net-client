@@ -104,13 +104,14 @@ public sealed class UmaClient(UmaConnection.UmaConnectionResult connection) : ID
 
     /// <summary>
     /// Streams events matching the query as they become available (subscription). Use <see cref="SubscribeAsync"/> for an async iterator; use this overload when you want to push events to a callback on a background task.
+    /// Events are processed sequentially: the next event is only delivered after <paramref name="onEvent"/> completes. Use this for projections that need async work (e.g. DB writes).
     /// Disposing the returned handle or cancelling <paramref name="ct"/> stops the subscription. Exceptions in the stream or in <paramref name="onEvent"/> are not thrown to the caller—handle them inside <paramref name="onEvent"/>.
     /// </summary>
     /// <param name="query">DCB Query to filter by types and tags.</param>
-    /// <param name="onEvent">Callback for each event. Should be idempotent when building projections.</param>
+    /// <param name="onEvent">Async callback for each event. Should be idempotent when building projections. Receives the linked cancellation token.</param>
     /// <param name="ct">When cancelled, the subscription stops.</param>
     /// <returns>Disposable that stops the subscription when disposed.</returns>
-    public IDisposable SubscribeWithCallback(UmaQuery query, Action<SequencedUmaEvent> onEvent, CancellationToken ct = default)
+    public IDisposable SubscribeWithCallback(UmaQuery query, Func<SequencedUmaEvent, CancellationToken, Task> onEvent, CancellationToken ct = default)
     {
         var queryWithOpt = new UmaQueryWithOptions(query, new UmaQueryOptions { Subscribe = true });
         var stopCts = new CancellationTokenSource();
@@ -122,7 +123,7 @@ public sealed class UmaClient(UmaConnection.UmaConnectionResult connection) : ID
             try
             {
                 await foreach (var evt in ReadAsync(queryWithOpt, token).ConfigureAwait(false))
-                    onEvent(evt);
+                    await onEvent(evt, token).ConfigureAwait(false);
             }
             finally
             {

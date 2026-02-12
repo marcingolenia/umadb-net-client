@@ -31,10 +31,11 @@ type UmaClient(connection: UmaConnectionResult) =
     interface IDisposable with
         member _.Dispose() = (connection :> IDisposable).Dispose()
     
-let readWithOptions (query: QueryItem list)
+let readWithOptions (client: UmaClient)
+                    (ct: CancellationToken)
+                    (query: QueryItem list)
                     (options: QueryOptions)
-                    (client: UmaClient)
-                    (ct: CancellationToken) =
+                    : TaskSeq<SequencedUmaEvent> =
     taskSeq {
         try
             ct.ThrowIfCancellationRequested()
@@ -49,13 +50,13 @@ let readWithOptions (query: QueryItem list)
 let readList (client: UmaClient) (query: QueryItem list): Task<SequencedUmaEvent list * int64 option> =
     task {
         let! events =
-            readWithOptions query QueryOptions.defaults client CancellationToken.None
+            readWithOptions client CancellationToken.None query QueryOptions.defaults 
             |> TaskSeq.toListAsync
         let head = events |> List.tryLast |> Option.map (fun e -> e.Position)
         return events, head
     }
 
-let readHead (client: UmaClient) (ct: CancellationToken)   =
+let readHead (client: UmaClient) (ct: CancellationToken) =
     task {
         try
             let! response = client.Service.Head({ _unused = Nullable() }, CallContext.op_Implicit ct)
@@ -137,3 +138,29 @@ let append (client: UmaClient) (ct: CancellationToken) (op: AppendOperation) : T
             | :? IntegrityException -> return Error (ErrorMessage umaEx.Message)
             | _ -> return raise umaEx
     }
+
+
+/// Subscription handle; dispose to stop the subscription.
+type SubscriptionHandle(cts: CancellationTokenSource) =
+    interface IDisposable with
+        member _.Dispose() = cts.Cancel(); cts.Dispose()
+
+/// Streams events matching the query as they become available (subscription), invoking the async callback for each event sequentially.
+/// Disposing the returned handle or cancelling <c>ct</c> stops the subscription. Handle exceptions inside <c>onEvent</c>.
+let subscribeWithCallback (client: UmaClient) (ct: CancellationToken) (query: QueryItem list) (onEvent: SequencedUmaEvent * CancellationToken -> Task) : IDisposable =
+    let stopCts = new CancellationTokenSource()
+    let linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct, stopCts.Token)
+    let token = linkedCts.Token
+    let options = QueryOptions.defaults |> QueryOptions.subscribe
+
+    Task.Run((fun () ->
+        task {
+            try
+                for evt in readWithOptions client token query options do
+                    do! onEvent(evt, token)
+            finally
+                linkedCts.Dispose()
+        } :> Task), token)
+    |> ignore
+
+    new SubscriptionHandle(stopCts) :> IDisposable
