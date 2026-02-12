@@ -7,10 +7,12 @@ open System.Threading.Tasks
 open FSharp.Control
 open FsUnit.Xunit
 open Xunit
-open UmaDb.Fsharp.ConnectionBuilder
-open UmaDb.Fsharp.Client
-open UmaDb.Fsharp.Types
-open UmaDb.Fsharp
+open UmaDb.Client.ClientBuilder
+open UmaDb.Client.Errors
+open UmaDb.Client.Query
+open UmaDb.Client.Event
+open UmaDb.Client.Operations
+
 
 [<Fact>]
 let ``Read throws when cancellation is requested before starting`` () =
@@ -42,7 +44,7 @@ let ``Read throws when cancelled during stream`` () =
         }
         :> Task
 
-    Assert.ThrowsAsync<Errors.CancelledException>(work) |> ignore
+    Assert.ThrowsAsync<CancelledException>(work) |> ignore
 
 [<Fact>]
 let ``When events were appended then reading with correct types and tags retrieve them`` () =
@@ -100,7 +102,7 @@ let ``When events are appended and failCondition fails then IntegrationError is 
         secondAppendResponse.IsError |> should be True
         match secondAppendResponse with
         | Ok _ -> failwith "Expected Error (IntegrityError.ErrorMessage)"
-        | Error (Errors.IntegrityError.ErrorMessage msg) ->  msg |> should haveSubstring "condition failed: condition: "
+        | Error (IntegrityError.ErrorMessage msg) -> msg |> should haveSubstring "condition failed: condition: "
     }
     
 [<Fact>]

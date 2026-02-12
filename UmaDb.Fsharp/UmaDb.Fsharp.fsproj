@@ -4,7 +4,7 @@
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
         <NoWarn>$(NoWarn);1591</NoWarn>
         <PackageId>UmaDb.Client.Fsharp</PackageId>
-        <Version>0.0.2</Version>
+        <Version>0.1.0</Version>
         <Title>UmaDb .NET Client (F#)</Title>
         <Authors>UmaDb .NET Client Contributors</Authors>
         <Company>UmaDb</Company>
@@ -21,9 +21,10 @@
     </PropertyGroup>
     <ItemGroup>
         <Compile Include="Errors.fs" />
-        <Compile Include="Types.fs" />
+        <Compile Include="Event.fs" />
+        <Compile Include="Query.fs" />
+        <Compile Include="ClientBuilder.fs" />
         <Compile Include="UmaClient.fs" />
-        <Compile Include="ConnectionBuilder.fs" />
     </ItemGroup>
     <ItemGroup>
       <ProjectReference Include="..\UmaDb.Core\UmaDb.Core.fsproj" PrivateAssets="all" />

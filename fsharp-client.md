@@ -12,25 +12,39 @@ head:
 
 F# client for [UmaDB](https://umadb.io/) via gRPC. Implements [DCB](https://dcb.events/specification/) for optimistic concurrency in event-sourced systems. The API is **async-only** (tasks and `TaskSeq`); use `task { }` and pipeline-friendly functions. Errors from append conditions and tracking are returned as `Result<int64, IntegrityError>` instead of exceptions.
 
+### Modules
+
+The client is split into these modules under `UmaDb.Client`:
+
+| Module | Use when |
+|--------|----------|
+| **ClientBuilder** | Building a connection (host, port, TLS, API key) and creating a `UmaClient`. |
+| **Operations** | Reading, appending, and subscribing: `readList`, `readWithOptions`, `append`, `subscribeWithCallback`, etc. |
+| **Query** | Defining queries and read options: `QueryItem`, `Query`, `QueryOptions` and the `QueryOptions` pipeline (`fromPosition`, `limit`, `subscribe`, …). |
+| **Event** | Working with event shapes: `UmaEvent`, `SequencedUmaEvent`, `UmaTrackingInfo`. |
+| **Errors** | Handling failures: `UmaDbException` and derived types, `IntegrityError`. |
+
+Typical usage: open **ClientBuilder** and **Operations** to connect and run reads/appends; open **Event** and **Query** when constructing events and queries.
+
 ## Installation
 
-Install the **UmaDb.Fsharp** NuGet package. The package targets .NET 10.0 and is compatible with that framework or higher. It depends on `FSharp.Control.TaskSeq` for streaming.
+Install the **UmaDb.Client.Fsharp** NuGet package. The package targets .NET 10.0 and is compatible with that framework or higher. It depends on `FSharp.Control.TaskSeq` for streaming.
 
 **.NET CLI:**
 
 ```bash
-dotnet add package UmaDb.Fsharp
+dotnet add package UmaDb.Client.Fsharp
 ```
 
-For other installation methods see the [NuGet page](https://www.nuget.org/packages/UmaDb.Fsharp/).
+For other installation methods see the [NuGet page](https://www.nuget.org/packages/UmaDb.Client.Fsharp).
 
 ## Connection
 
 Build connection options with the pipeline, then `build` to get a client:
 
 ```fsharp
-open UmaDb.Fsharp.ConnectionBuilder
-open UmaDb.Fsharp.Client
+open UmaDb.Client.ClientBuilder
+open UmaDb.Client.Operations
 
 use client = connect "localhost" 50051 |> withApiKey "key" |> withTls |> build
 ```
@@ -93,9 +107,10 @@ open System
 open System.Text.Json
 open System.Threading
 open System.Threading.Tasks
-open UmaDb.Fsharp.ConnectionBuilder
-open UmaDb.Fsharp.Client
-open UmaDb.Client.Types
+open UmaDb.Client.ClientBuilder
+open UmaDb.Client.Operations
+open UmaDb.Client.Event
+open UmaDb.Client.Query
 
 use client = connect "localhost" 50051 |> build
 
@@ -199,6 +214,10 @@ Read → conditional append → conflict → idempotent retry. On condition fail
 
 ```fsharp
 open System.Threading
+open UmaDb.Client.ClientBuilder
+open UmaDb.Client.Operations
+open UmaDb.Client.Event
+open UmaDb.Client.Query
 
 use client = connect "localhost" 50051 |> build
 let ct = CancellationToken.None
@@ -226,7 +245,7 @@ let! posResult2 = append client ct op
 
 ## API reference
 
-### Connection (UmaDb.Fsharp.ConnectionBuilder)
+### ClientBuilder (UmaDb.Client.ClientBuilder)
 
 | Function | Purpose |
 |----------|---------|
@@ -236,7 +255,7 @@ let! posResult2 = append client ct op
 | `withApiKey (key: string) (builder)` | Set API key (use with TLS). |
 | `build (builder)` | Creates a `UmaClient`. Reuse the instance; dispose when shutting down. |
 
-### Client (UmaDb.Fsharp.Client)
+### Operations (UmaDb.Client.Operations)
 
 | Function | Purpose |
 |----------|---------|
@@ -251,17 +270,26 @@ let! posResult2 = append client ct op
 | `append client ct op` | Appends atomically. Returns `Task<Result<int64, IntegrityError>>` — `Ok position` or `Error (ErrorMessage _)` when condition fails or tracking not increasing. |
 | `subscribeWithCallback client ct query onEvent` | Subscription; invokes async `onEvent(evt, ct)` for each event (sequential). Returns `IDisposable` — use `use _ = ...` to stop; disposing cancels the subscription and stops delivery. Handle exceptions in `onEvent`. |
 
-### Types (UmaDb.Client.Types)
+### Event (UmaDb.Client.Event)
 
-- **Query** — `QueryItem list`. Empty list = match all. Each item: `{ Types: string list; Tags: string list }` (types OR'd, tags AND'd per item; items OR'd).
-- **QueryOptions** — `FromPosition`, `Limit`, `BatchSize`, `Backwards`, `Subscribe`. Build with `QueryOptions.defaults` and pipe `QueryOptions.fromPosition`, `QueryOptions.limit`, `QueryOptions.batchSize`, `QueryOptions.backwards`, `QueryOptions.subscribe` as needed.
 - **UmaEvent** — `EventType`, `Data` (ReadOnlyMemory&lt;byte&gt;), `Tags` (string list option), `Id` (Guid option).
 - **SequencedUmaEvent** — `Position: int64`, `Event: UmaEvent`.
 - **UmaTrackingInfo** — `Source: string`, `Position: int64`.
+
+### Query (UmaDb.Client.Query)
+
+- **Query** — `QueryItem list`. Empty list = match all. Each item: `{ Types: string list; Tags: string list }` (types OR'd, tags AND'd per item; items OR'd).
+- **QueryOptions** — `FromPosition`, `Limit`, `BatchSize`, `Backwards`, `Subscribe`. Build with `QueryOptions.defaults` and pipe `QueryOptions.fromPosition`, `QueryOptions.limit`, `QueryOptions.batchSize`, `QueryOptions.backwards`, `QueryOptions.subscribe` as needed.
+
+### Operations (UmaDb.Client.Operations) — types
+
 - **AppendOperation** — Record with `Events`, `FailIfMatch`, `After`, `TrackingInfo`. Build with `appendOperation` and pipeline.
+
+### Errors (UmaDb.Client.Errors)
+
 - **IntegrityError** — `ErrorMessage of string` (append condition or tracking violation).
 
-### Exceptions
+### Exceptions (UmaDb.Client.Errors)
 
 Other failures (network, auth, etc.) are thrown as `UmaDbException` and derived: `AuthenticationException`, `IntegrityException` (thrown only if the failure is surfaced outside the Result-returning API, e.g. by rethrowing after inspecting `Error (ErrorMessage _)`), `CorruptionException`, `SerializationException`, `InternalException`, `IoException`, `CancelledException`.
 

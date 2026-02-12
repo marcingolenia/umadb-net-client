@@ -3,12 +3,13 @@ module Tests.Client.TrackingInfo
 open System.Threading
 open FsUnit.Xunit
 open Xunit
-open UmaDb.Fsharp.ConnectionBuilder
-open UmaDb.Fsharp.Client
-open UmaDb.Fsharp
+open UmaDb.Client.ClientBuilder
+open UmaDb.Client.Errors
+open UmaDb.Client.Operations
+
 
 [<Fact>]
-let ``can sore tracking info`` () = 
+let ``can store tracking info`` () = 
     task {
         // Arrange
         use uma = connect "localhost" 50002 |> build
@@ -35,6 +36,6 @@ let ``when storing non increasing tracking info then IntegrityException is throw
         let! appendResponse = append uma CancellationToken.None (appendOperation [] |> track source sameNext)
         // Assert
         match appendResponse with
-        | Error (Errors.IntegrityError.ErrorMessage msg) ->  msg |> should haveSubstring "Integrity error: condition failed: non-increasing tracking position for source"
+        | Error (IntegrityError.ErrorMessage msg) -> msg |> should haveSubstring "Integrity error: condition failed: non-increasing tracking position for source"
         | _ -> failwith "Expected Error (IntegrityError.ErrorMessage)"
     }

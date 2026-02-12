@@ -7,9 +7,10 @@ open System.Threading.Tasks
 open FSharp.Control
 open FsUnit.Xunit
 open Xunit
-open UmaDb.Fsharp.ConnectionBuilder
-open UmaDb.Fsharp.Client
-open UmaDb.Fsharp.Types
+open UmaDb.Client.ClientBuilder
+open UmaDb.Client.Event
+open UmaDb.Client.Query
+open UmaDb.Client.Operations
 
 type OrderCreated = { OrderId: Guid; Amount: decimal }
 

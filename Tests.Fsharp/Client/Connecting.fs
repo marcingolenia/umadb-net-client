@@ -7,9 +7,9 @@ open System.Threading
 open System.Threading.Tasks
 open FSharp.Control
 open Xunit
-open UmaDb.Fsharp.ConnectionBuilder
-open UmaDb.Fsharp.Client
-open UmaDb.Fsharp.Errors
+open UmaDb.Client.ClientBuilder
+open UmaDb.Client.Errors
+open UmaDb.Client.Operations
 
 [<Fact>]
 let ``Connect throws on empty host`` () =

@@ -1,37 +1,17 @@
-/// <summary>F# client for reading and appending events to UmaDB via gRPC (DCB-compliant).</summary>
-/// <remarks>Create with <c>connect host port |> build</c> (or <c>withTls</c> / <c>withApiKey</c>). Reuse one instance per process; implement <c>IDisposable</c> and dispose when shutting down.</remarks>
-module UmaDb.Fsharp.Client
+/// <summary>F# functions for reading and appending events to UmaDB via gRPC (DCB-compliant).</summary>
+module UmaDb.Client.Operations
 
 open System
 open System.Threading
 open System.Threading.Tasks
-open Client.UmaConnection
-open ProtoBuf.Grpc.Client
-open UmaDb.Core
 open ProtoBuf.Grpc
+open UmaDb.Core
 open Grpc.Core
 open FSharp.Control
-open Errors
-open Types
-
-/// <summary>Client instance for a single UmaDB connection. Dispose when no longer needed.</summary>
-type UmaClient(connection: UmaConnectionResult) =
-    let service = connection.GetCallInvoker().CreateGrpcService<IDcbService>()
-    member internal _.Service = service
-    
-    member internal _.ReadBatches (query: QueryItem list) (options: QueryOptions) (ct: CancellationToken) =
-        let queryProto = Query.toProto query
-        let request: ReadRequest =
-            { Query = Option.defaultValue Nullable.query queryProto
-              Start = toNullableUInt64 options.FromPosition
-              Backwards = options.Backwards
-              Limit = toNullableUInt32 options.Limit
-              Subscribe = options.Subscribe
-              BatchSize = toNullableUInt32 options.BatchSize }
-        service.Read(request, CallContext.op_Implicit ct)
-
-    interface IDisposable with
-        member _.Dispose() = (connection :> IDisposable).Dispose()
+open UmaDb.Client.Errors
+open UmaDb.Client.Event
+open UmaDb.Client.Query
+open UmaDb.Client.ClientBuilder
 
 /// <summary>Streams Sequenced Events matching the query (DCB read). Use for large result sets or incremental processing.</summary>
 /// <param name="client">The UmaDB client.</param>
