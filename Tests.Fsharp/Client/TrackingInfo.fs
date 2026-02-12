@@ -5,6 +5,7 @@ open FsUnit.Xunit
 open Xunit
 open UmaDb.Fsharp.ConnectionBuilder
 open UmaDb.Fsharp.Client
+open UmaDb.Fsharp
 
 [<Fact>]
 let ``can sore tracking info`` () = 

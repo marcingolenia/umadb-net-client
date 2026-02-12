@@ -3,7 +3,7 @@ module Tests.Client.RcpException
 open FsUnit.Xunit
 open Grpc.Core
 open Xunit
-open Errors
+open UmaDb.Fsharp.Errors
 
 [<Theory>]
 [<InlineData(StatusCode.Unauthenticated, "Invalid credentials")>]

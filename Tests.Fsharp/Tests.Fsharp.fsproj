@@ -36,7 +36,6 @@
       </None>
       <Compile Include="Core\SimpleConnectivity.fs" />
       <Compile Include="Core\SocketExhautions.fs" />
-      <Compile Include="Client\Operations.fs" />
       <Compile Include="Client\Connecting.fs" />
       <Compile Include="Client\Reading.fs" />
       <Compile Include="Client\TrackingInfo.fs" />

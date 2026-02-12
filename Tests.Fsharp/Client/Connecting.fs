@@ -9,7 +9,7 @@ open FSharp.Control
 open Xunit
 open UmaDb.Fsharp.ConnectionBuilder
 open UmaDb.Fsharp.Client
-open Errors
+open UmaDb.Fsharp.Errors
 
 [<Fact>]
 let ``Connect throws on empty host`` () =

@@ -9,7 +9,7 @@ open FsUnit.Xunit
 open Xunit
 open UmaDb.Fsharp.ConnectionBuilder
 open UmaDb.Fsharp.Client
-open UmaDb.Client.Types
+open UmaDb.Fsharp.Types
 
 type OrderCreated = { OrderId: Guid; Amount: decimal }
 

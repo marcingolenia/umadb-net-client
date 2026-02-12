@@ -9,7 +9,8 @@ open FsUnit.Xunit
 open Xunit
 open UmaDb.Fsharp.ConnectionBuilder
 open UmaDb.Fsharp.Client
-open UmaDb.Client.Types
+open UmaDb.Fsharp.Types
+open UmaDb.Fsharp
 
 [<Fact>]
 let ``Read throws when cancellation is requested before starting`` () =
