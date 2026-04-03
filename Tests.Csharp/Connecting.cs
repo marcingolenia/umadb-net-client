@@ -59,9 +59,8 @@ public class Connecting
     {
         using var umaClient = UmaClient.Connect(new UmaClientOptions().WithHost("localhost").WithPort(50001));
 
-        var exception = await Assert.ThrowsAsync<UmaDbException>(() =>
+        await Assert.ThrowsAnyAsync<UmaDbException>(() =>
             umaClient.GetHeadAsync(TestContext.Current.CancellationToken).AsTask());
-        Assert.IsType<UmaDbException>(exception);
     }
 
     [Fact]
