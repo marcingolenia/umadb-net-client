@@ -36,6 +36,6 @@ let ``when storing non increasing tracking info then IntegrityException is throw
         let! appendResponse = append uma CancellationToken.None (appendOperation [] |> track source sameNext)
         // Assert
         match appendResponse with
-        | Error (IntegrityError.ErrorMessage msg) -> msg |> should haveSubstring "Integrity error: condition failed: non-increasing tracking position for source"
+        | Error (IntegrityError.ErrorMessage msg) -> msg |> should haveSubstring "integrity error: condition failed: non-increasing tracking position for source"
         | _ -> failwith "Expected Error (IntegrityError.ErrorMessage)"
     }

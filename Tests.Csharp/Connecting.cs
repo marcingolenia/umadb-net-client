@@ -73,7 +73,7 @@ public class Connecting
         var exception = await Assert.ThrowsAsync<UmaDbException.AuthenticationException>(() =>
             umaClient.GetHeadAsync(TestContext.Current.CancellationToken).AsTask());
         Assert.IsType<UmaDbException.AuthenticationException>(exception);
-        Assert.Equal("Authentication error: missing or invalid API key", exception.Message);
+        Assert.Equal("authentication error: missing or invalid API key", exception.Message);
     }
 
     [Fact]
@@ -85,7 +85,7 @@ public class Connecting
         var exception = await Assert.ThrowsAsync<UmaDbException.AuthenticationException>(() =>
             umaClient.GetHeadAsync(TestContext.Current.CancellationToken).AsTask());
         Assert.IsType<UmaDbException.AuthenticationException>(exception);
-        Assert.Equal("Authentication error: missing or invalid API key", exception.Message);
+        Assert.Equal("authentication error: missing or invalid API key", exception.Message);
     }
 
     [Fact]

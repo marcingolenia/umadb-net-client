@@ -77,7 +77,7 @@ let ``cannot create uma client without apikey if server requires tls with apikey
             }
             :> Task
         let! ex = Assert.ThrowsAsync<AuthenticationException>(work)
-        Assert.Equal("Authentication error: missing or invalid API key", ex.Message)
+        Assert.Equal("authentication error: missing or invalid API key", ex.Message)
     }
 
 [<Fact>]
@@ -91,7 +91,7 @@ let ``cannot create uma client with wrong apikey`` () =
             }
             :> Task
         let! ex = Assert.ThrowsAsync<AuthenticationException>(work)
-        Assert.Equal("Authentication error: missing or invalid API key", ex.Message)
+        Assert.Equal("authentication error: missing or invalid API key", ex.Message)
     }
 
 [<Fact>]
