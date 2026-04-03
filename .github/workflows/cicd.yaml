@@ -21,12 +21,6 @@ jobs:
         run: dotnet restore
       - name: Build
         run: dotnet build --no-restore
-      # Default TLS on Linux uses OpenSSL + /etc/ssl/certs; .NET's CurrentUser\Root store does not apply.
-      # Installing the test CA lets "withTls" (no withCaCert) succeed in CI, same as trusting the CA locally.
-      - name: Trust test CA
-        run: |
-          sudo cp Tests.Fsharp/certs/ca.pem /usr/local/share/ca-certificates/umadb-test-ca.crt
-          sudo update-ca-certificates
       - name: Test
         run: dotnet test
       - name: Pack NuGet
