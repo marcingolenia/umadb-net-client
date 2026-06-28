@@ -11,6 +11,9 @@ type IDcbService =
     abstract Read : ReadRequest * CallContext -> IAsyncEnumerable<ReadResponse>
 
     [<OperationContract>]
+    abstract Subscribe : SubscribeRequest * CallContext -> IAsyncEnumerable<SubscribeResponse>
+
+    [<OperationContract>]
     abstract Append : AppendRequest * CallContext -> ValueTask<AppendResponse>
 
     [<OperationContract>]

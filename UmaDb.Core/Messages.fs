@@ -44,6 +44,16 @@ type ReadResponse =
       [<ProtoMember(2)>] Head: Nullable<uint64> }
 
 [<ProtoContract; CLIMutable>]
+type SubscribeRequest =
+    { [<ProtoMember(1)>] Query: Query
+      [<ProtoMember(2)>] After: Nullable<uint64>
+      [<ProtoMember(3)>] BatchSize: Nullable<uint32> }
+
+[<ProtoContract; CLIMutable>]
+type SubscribeResponse =
+    { [<ProtoMember(1)>] Events: ResizeArray<SequencedEvent> }
+
+[<ProtoContract; CLIMutable>]
 type TrackingInfo =
     { [<ProtoMember(1)>] Source: string
       [<ProtoMember(2)>] Position: uint64 }
@@ -89,6 +99,7 @@ type ErrorType =
     | Corruption = 3
     | Internal = 4
     | Authentication = 5
+    | InvalidArgument = 6
 
 [<ProtoContract; CLIMutable>]
 type ErrorResponse =
