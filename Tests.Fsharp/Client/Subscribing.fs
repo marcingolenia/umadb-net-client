@@ -53,7 +53,7 @@ let ``can subscribe to events using subscribeWithCallback`` () =
     }
 
 [<Fact>]
-let ``can subscribe using read with subscribe option`` () =
+let ``can subscribe using subscribe`` () =
     task {
         use umaClient = connect "localhost" 50002 |> build
         let tag = $"subscribe-async-{Guid.NewGuid()}"
@@ -67,12 +67,11 @@ let ``can subscribe using read with subscribe option`` () =
         let received = TaskCompletionSource<SequencedUmaEvent>()
         let ct = CancellationToken.None
         let query = [ { Types = [ "OrderCreated" ]; Tags = [ tag ] } ]
-        let options = QueryOptions.defaults |> QueryOptions.subscribe
 
         let _ =
             Task.Run(fun () ->
                 task {
-                    for evt in readWithOptions umaClient ct query options do
+                    for evt in subscribe umaClient ct query QueryOptions.defaults do
                         received.TrySetResult(evt) |> ignore
                 } :> Task)
 

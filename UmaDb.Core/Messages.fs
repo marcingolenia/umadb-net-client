@@ -35,7 +35,6 @@ type ReadRequest =
       [<ProtoMember(2)>] Start: Nullable<uint64>
       [<ProtoMember(3)>] Backwards: bool
       [<ProtoMember(4)>] Limit: Nullable<uint32>
-      [<ProtoMember(5)>] Subscribe: bool
       [<ProtoMember(6)>] BatchSize: Nullable<uint32> }
 
 [<ProtoContract; CLIMutable>]

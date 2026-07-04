@@ -50,9 +50,16 @@ type UmaClient(connection: UmaConnectionResult) =
               Start = toNullableUInt64 options.FromPosition
               Backwards = options.Backwards
               Limit = toNullableUInt32 options.Limit
-              Subscribe = options.Subscribe
               BatchSize = toNullableUInt32 options.BatchSize }
         service.Read(request, CallContext.op_Implicit ct)
+        
+    member internal _.Subscribe (query: QueryItem list) (options: QueryOptions) (ct: CancellationToken) =
+        let queryProto = Query.toProto query
+        let request: SubscribeRequest =
+            { Query = Option.defaultValue Nullable.query queryProto
+              After = toNullableUInt64 options.FromPosition
+              BatchSize = toNullableUInt32 options.BatchSize }
+        service.Subscribe(request, CallContext.op_Implicit ct)
 
     interface IDisposable with
         member _.Dispose() = (connection :> IDisposable).Dispose()

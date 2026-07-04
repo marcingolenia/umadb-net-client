@@ -29,11 +29,11 @@ message AppendCondition {
 }
 
 message ReadRequest {
+  reserved 5; // was: bool subscribe (use dedicated Subscribe RPC)
   optional Query query = 1;
   optional uint64 start = 2;
   optional bool backwards = 3;
   optional uint32 limit = 4;
-  optional bool subscribe = 5;
   optional uint32 batch_size = 6;
 }
 

@@ -4,7 +4,7 @@ namespace UmaDb.Client;
 
 /// <summary>
 /// Builds a filter over the event log by event type and tags.
-/// Use with <see cref="UmaClient.ReadAsync(UmaQuery, CancellationToken)"/>, <see cref="UmaClient.ReadListAsync(UmaQuery, CancellationToken)"/>, <see cref="UmaClient.SubscribeAsync"/>, <see cref="UmaClient.SubscribeWithCallback"/>, and append conditions.
+/// Use with <see cref="UmaClient.ReadAsync(UmaQuery, CancellationToken)"/>, <see cref="UmaClient.ReadListAsync(UmaQuery, CancellationToken)"/>, <see cref="UmaClient.SubscribeAsync(UmaQuery, CancellationToken)"/>, <see cref="UmaClient.SubscribeWithCallback"/>, and append conditions.
 /// </summary>
 public class UmaQuery
 {
@@ -35,7 +35,7 @@ public class UmaQuery
     }
 
     /// <summary>
-    /// Configures read options (position, limit, batch size, direction, subscribe) and returns a <see cref="UmaQueryWithOptions"/> for use with read/subscribe APIs.
+    /// Configures read options (position, limit, batch size, direction) and returns a <see cref="UmaQueryWithOptions"/> for use with read/subscribe APIs.
     /// </summary>
     public UmaQueryWithOptions WithOptions(Action<UmaQueryOptions>? configure = null)
     {
@@ -63,7 +63,7 @@ public class UmaQuery
 }
 
 /// <summary>
-/// Options for a read or subscribe operation: start position, limit, batch size, direction, and whether to keep the stream open for new events.
+/// Options for a read or subscribe operation: start position, limit, batch size, and direction.
 /// </summary>
 public class UmaQueryOptions
 {
@@ -75,15 +75,13 @@ public class UmaQueryOptions
     public int? BatchSize { get; set; }
     /// <summary>If true, read from the end of the log (or from <see cref="FromPosition"/>) backwards.</summary>
     public bool Backwards { get; set; }
-    /// <summary>If true, keep the stream open and deliver new events as they are appended (subscription).</summary>
-    public bool Subscribe { get; set; }
 }
 
 /// <summary>
 /// A read request: a query plus options. Create via <see cref="UmaQuery.WithOptions"/>.
 /// </summary>
 /// <param name="query">DCB Query to filter by types and tags.</param>
-/// <param name="options">Read options (position, limit, batch size, backwards, subscribe).</param>
+/// <param name="options">Read options (position, limit, batch size, backwards).</param>
 public class UmaQueryWithOptions(UmaQuery query, UmaQueryOptions options)
 {
     /// <summary>The DCB query used for this read.</summary>

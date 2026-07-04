@@ -57,35 +57,6 @@ public class Subscribing
         AssertReceivedOrderCreated(await received.Task, tag, orderCreated);
     }
 
-    [Fact]
-    public async Task can_subscribe_to_events_using_read_async()
-    {
-        using var umaClient = UmaClient.Connect(new UmaClientOptions().WithHost("localhost").WithPort(50051));
-        var tag = $"subscribe-{Guid.NewGuid()}";
-        var orderCreated = new OrderCreated(Guid.NewGuid(), 99m);
-        var eventToAppend = new UmaEvent(
-            nameof(OrderCreated),
-            JsonSerializer.SerializeToUtf8Bytes(orderCreated),
-            [tag]);
-
-        var received = new TaskCompletionSource<SequencedUmaEvent>();
-        var ct = TestContext.Current.CancellationToken;
-
-        var subscription = umaClient.ReadAsync(
-            UmaQuery.Where([nameof(OrderCreated)], [tag]).WithOptions(o => o.Subscribe = true),
-            ct);
-
-        _ = Task.Run(async () =>
-        {
-            await foreach (var evt in subscription)
-                received.TrySetResult(evt);
-        }, ct);
-
-        await umaClient.AppendAsync([eventToAppend], ct: ct);
-
-        AssertReceivedOrderCreated(await received.Task, tag, orderCreated);
-    }
-
     static void AssertReceivedOrderCreated(SequencedUmaEvent received, string tag, OrderCreated expected)
     {
         Assert.Equal(nameof(OrderCreated), received.Event.EventType);

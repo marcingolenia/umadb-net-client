@@ -17,7 +17,7 @@ open UmaDb.Client.ClientBuilder
 /// <param name="client">The UmaDB client.</param>
 /// <param name="ct">Cancellation token.</param>
 /// <param name="query">DCB Query: filter by Event Type and/or Tags (Query Items are OR'd).</param>
-/// <param name="options">Read options (position, limit, batch size, backwards, subscribe). Use <c>QueryOptions.defaults</c> or pipe <c>QueryOptions.subscribe</c> for a live stream.</param>
+/// <param name="options">Read options (position, limit, batch size, backwards). Use <c>QueryOptions.defaults</c>. For a live stream, use <c>subscribe</c>.</param>
 /// <returns>TaskSeq of <c>SequencedUmaEvent</c> (batch boundaries are internal).</returns>
 /// <remarks>See <see href="https://dcb.events/specification/">DCB Specification – Reading Events</see>.</remarks>
 let readWithOptions (client: UmaClient)
@@ -161,6 +161,27 @@ let append (client: UmaClient) (ct: CancellationToken) (op: AppendOperation) : T
     }
 
 
+/// <summary>Subscribes to events matching the query (dedicated Subscribe RPC) and streams existing plus newly appended events as they become available. Use for a live stream that stays open.</summary>
+/// <param name="client">The UmaDB client.</param>
+/// <param name="ct">When cancelled, the subscription stops.</param>
+/// <param name="query">DCB Query to filter by types and tags.</param>
+/// <param name="options">Subscription options. Only <c>FromPosition</c> (resume after a position) and <c>BatchSize</c> apply; use <c>QueryOptions.defaults</c> to stream from the beginning.</param>
+/// <returns>TaskSeq of <c>SequencedUmaEvent</c> that stays open for new events (batch boundaries are internal).</returns>
+let subscribe (client: UmaClient)
+              (ct: CancellationToken)
+              (query: QueryItem list)
+              (options: QueryOptions)
+              : TaskSeq<SequencedUmaEvent> =
+    taskSeq {
+        try
+            ct.ThrowIfCancellationRequested()
+            let batches = client.Subscribe query options ct
+            for batch in batches do
+                yield! Conversion.toSubscribeUmaEventList batch
+        with
+        | :? RpcException as ex -> raise (UmaDbException.ToUmaDbException(ex))
+    }
+
 /// <summary>Handle for an active subscription. Dispose to stop the subscription.</summary>
 type SubscriptionHandle(cts: CancellationTokenSource) =
     interface IDisposable with
@@ -176,12 +197,11 @@ let subscribeWithCallback (client: UmaClient) (ct: CancellationToken) (query: Qu
     let stopCts = new CancellationTokenSource()
     let linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct, stopCts.Token)
     let token = linkedCts.Token
-    let options = QueryOptions.defaults |> QueryOptions.subscribe
-
+    let options = QueryOptions.defaults
     Task.Run((fun () ->
         task {
             try
-                for evt in readWithOptions client token query options do
+                for evt in subscribe client token query options do
                     do! onEvent(evt, token)
             finally
                 linkedCts.Dispose()

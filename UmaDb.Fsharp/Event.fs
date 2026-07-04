@@ -58,13 +58,19 @@ module internal Conversion =
               | Some id -> id.ToString()
               | None -> Guid.NewGuid().ToString() }
 
-    let toSequencedUmaEventList (response: ReadResponse): SequencedUmaEvent list =
-        if response.Events = null || response.Events.Count = 0 then
+    let private eventsToList (events: ResizeArray<SequencedEvent>): SequencedUmaEvent list =
+        if events = null || events.Count = 0 then
             []
         else
-            response.Events
+            events
             |> Seq.map toSequencedUmaEvent
             |> List.ofSeq
+
+    let toSequencedUmaEventList (response: ReadResponse): SequencedUmaEvent list =
+        eventsToList response.Events
+
+    let toSubscribeUmaEventList (response: SubscribeResponse): SequencedUmaEvent list =
+        eventsToList response.Events
 
 
 let inline toNullableUInt64 (value: int64 option) =

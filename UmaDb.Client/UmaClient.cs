@@ -78,7 +78,7 @@ public sealed class UmaClient(UmaConnection.UmaConnectionResult connection) : ID
         return (results.Count == 0 ? EmptyReadBatchEvents : results, head);
     }
 
-    /// <summary>Streams events one by one. Use for large result sets or when you need incremental processing. Set <see cref="UmaQueryOptions.Subscribe"/> to keep the stream open for new events.</summary>
+    /// <summary>Streams events one by one. Use for large result sets or when you need incremental processing. Use <see cref="SubscribeAsync(UmaQuery, CancellationToken)"/> to keep the stream open for new events.</summary>
     /// <param name="query">DCB Query to filter by types and tags.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Async sequence of <see cref="SequencedUmaEvent"/> (batch boundaries are internal).</returns>
@@ -87,8 +87,8 @@ public sealed class UmaClient(UmaConnection.UmaConnectionResult connection) : ID
         CancellationToken ct = default) =>
         ReadAsync(new UmaQueryWithOptions(query, new UmaQueryOptions()), ct);
 
-    /// <summary>Streams events one by one. Use <see cref="UmaQueryOptions.Subscribe"/> to keep the stream open for new events.</summary>
-    /// <param name="queryWithOptions">DCB Query and options (position, limit, batch size, backwards, subscribe).</param>
+    /// <summary>Streams events one by one. Use <see cref="SubscribeAsync(UmaQuery, CancellationToken)"/> to keep the stream open for new events.</summary>
+    /// <param name="queryWithOptions">DCB Query and options (position, limit, batch size, backwards).</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Async sequence of <see cref="SequencedUmaEvent"/>.</returns>
     public async IAsyncEnumerable<SequencedUmaEvent> ReadAsync(
@@ -103,7 +103,7 @@ public sealed class UmaClient(UmaConnection.UmaConnectionResult connection) : ID
     }
 
     /// <summary>
-    /// Streams events matching the query as they become available (subscription). Use <see cref="SubscribeAsync"/> for an async iterator; use this overload when you want to push events to a callback on a background task.
+    /// Streams events matching the query as they become available (subscription). Use <see cref="SubscribeAsync(UmaQuery, CancellationToken)"/> for an async iterator; use this overload when you want to push events to a callback on a background task.
     /// Events are processed sequentially: the next event is only delivered after <paramref name="onEvent"/> completes. Use this for projections that need async work (e.g. DB writes).
     /// Disposing the returned handle or cancelling <paramref name="ct"/> stops the subscription. Exceptions in the stream or in <paramref name="onEvent"/> are not thrown to the caller—handle them inside <paramref name="onEvent"/>.
     /// </summary>
@@ -113,7 +113,6 @@ public sealed class UmaClient(UmaConnection.UmaConnectionResult connection) : ID
     /// <returns>Disposable that stops the subscription when disposed.</returns>
     public IDisposable SubscribeWithCallback(UmaQuery query, Func<SequencedUmaEvent, CancellationToken, Task> onEvent, CancellationToken ct = default)
     {
-        var queryWithOpt = new UmaQueryWithOptions(query, new UmaQueryOptions { Subscribe = true });
         var stopCts = new CancellationTokenSource();
         var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct, stopCts.Token);
         var token = linkedCts.Token;
@@ -122,7 +121,7 @@ public sealed class UmaClient(UmaConnection.UmaConnectionResult connection) : ID
         {
             try
             {
-                await foreach (var evt in ReadAsync(queryWithOpt, token).ConfigureAwait(false))
+                await foreach (var evt in SubscribeAsync(query, token).ConfigureAwait(false))
                     await onEvent(evt, token).ConfigureAwait(false);
             }
             finally
@@ -137,13 +136,54 @@ public sealed class UmaClient(UmaConnection.UmaConnectionResult connection) : ID
     /// <summary>
     /// Subscribes to events matching the query and yields them as an async stream (like <see cref="ReadAsync(UmaQuery, CancellationToken)"/> but keeps the stream open for new events).
     /// Use this when you want to consume events with <c>await foreach</c>. Use <see cref="SubscribeWithCallback"/> when you prefer a callback on a background task.
-    /// When the server exposes a dedicated Subscribe RPC, this method will use it (no backwards/limit); until then it uses the read stream with subscribe enabled.
+    /// Uses the dedicated Subscribe RPC.
     /// </summary>
     /// <param name="query">DCB Query to filter by types and tags.</param>
     /// <param name="ct">Cancellation token; when cancelled, the subscription stops.</param>
     /// <returns>Async sequence of <see cref="SequencedUmaEvent"/> (existing and newly appended events).</returns>
     public IAsyncEnumerable<SequencedUmaEvent> SubscribeAsync(UmaQuery query, CancellationToken ct = default) =>
-        ReadAsync(new UmaQueryWithOptions(query, new UmaQueryOptions { Subscribe = true }), ct);
+        SubscribeAsync(new UmaQueryWithOptions(query, new UmaQueryOptions()), ct);
+
+    /// <summary>
+    /// Subscribes to events matching the query and yields them as an async stream (existing and newly appended events). Uses the dedicated Subscribe RPC.
+    /// Only <see cref="UmaQueryOptions.FromPosition"/> (resume after a position) and <see cref="UmaQueryOptions.BatchSize"/> apply; other options are ignored.
+    /// </summary>
+    /// <param name="queryWithOptions">DCB Query and options (subscribe honours FromPosition and BatchSize).</param>
+    /// <param name="ct">Cancellation token; when cancelled, the subscription stops.</param>
+    /// <returns>Async sequence of <see cref="SequencedUmaEvent"/> (existing and newly appended events).</returns>
+    public async IAsyncEnumerable<SequencedUmaEvent> SubscribeAsync(
+        UmaQueryWithOptions queryWithOptions,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+    {
+        var request = new SubscribeRequest
+        {
+            Query = queryWithOptions.Query.ToProto(),
+            After = (ulong?)queryWithOptions.Options.FromPosition,
+            BatchSize = (uint?)queryWithOptions.Options.BatchSize,
+        };
+
+        var stream = _service.Subscribe(request, ct);
+        await using var enumerator = stream.GetAsyncEnumerator(ct);
+
+        while (true)
+        {
+            SubscribeResponse response;
+            try
+            {
+                if (!await enumerator.MoveNextAsync().ConfigureAwait(false))
+                    yield break;
+
+                response = enumerator.Current;
+            }
+            catch (RpcException ex)
+            {
+                throw UmaDbException.ToUmaDbException(ex);
+            }
+
+            foreach (var evt in MapEvents(response.Events))
+                yield return evt;
+        }
+    }
 
     private static ReadOnlyMemory<byte> DataOrEmpty(byte[]? data)
     {
@@ -172,7 +212,6 @@ public sealed class UmaClient(UmaConnection.UmaConnectionResult connection) : ID
             Start = (ulong?)queryWithOptions.Options.FromPosition,
             Backwards = queryWithOptions.Options.Backwards,
             Limit = (uint?)queryWithOptions.Options.Limit,
-            Subscribe = queryWithOptions.Options.Subscribe,
             BatchSize = (uint?)queryWithOptions.Options.BatchSize,
         };
 
@@ -200,15 +239,17 @@ public sealed class UmaClient(UmaConnection.UmaConnectionResult connection) : ID
 
     private static UmaReadBatch MapToBatch(ReadResponse response)
     {
-        var rawEvents = response.Events;
-        var count = rawEvents?.Count ?? 0;
+        var events = MapEvents(response.Events);
+        return new UmaReadBatch(
+            events.Length == 0 ? EmptyReadBatchEvents : events,
+            response.Head.HasValue ? (long)response.Head.Value : null);
+    }
 
+    private static SequencedUmaEvent[] MapEvents(List<SequencedEvent>? rawEvents)
+    {
+        var count = rawEvents?.Count ?? 0;
         if (count == 0)
-        {
-            return new UmaReadBatch(
-                EmptyReadBatchEvents,
-                response.Head.HasValue ? (long)response.Head.Value : null);
-        }
+            return [];
 
         var events = new SequencedUmaEvent[count];
         for (var i = 0; i < count; i++)
@@ -225,9 +266,7 @@ public sealed class UmaClient(UmaConnection.UmaConnectionResult connection) : ID
                         Guid.TryParse(ev.Uuid, out var guid) ? guid : (Guid?)null));
         }
 
-        return new UmaReadBatch(
-            events,
-            response.Head.HasValue ? (long)response.Head.Value : null);
+        return events;
     }
 
     private sealed class SubscriptionHandle(CancellationTokenSource cts) : IDisposable

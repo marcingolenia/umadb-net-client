@@ -1,4 +1,4 @@
-/// <summary>Query and read options for filtering and streaming events (DCB-compliant). Build queries as <c>QueryItem list</c>; use <c>QueryOptions</c> for position, limit, subscribe, etc.</summary>
+/// <summary>Query and read options for filtering and streaming events (DCB-compliant). Build queries as <c>QueryItem list</c>; use <c>QueryOptions</c> for position, limit, batch size, etc.</summary>
 module UmaDb.Client.Query
 
 open UmaDb.Core
@@ -18,15 +18,13 @@ type QueryOptions =
     { FromPosition: int64 option
       Limit: int option
       BatchSize: int option
-      Backwards: bool
-      Subscribe: bool }
+      Backwards: bool }
 
 let defaultQueryOptions =
     { FromPosition = None
       Limit = None
       BatchSize = None
-      Backwards = false
-      Subscribe = false }
+      Backwards = false }
 
 module internal Query =
     let toProto (query: Query): UmaDb.Core.Query option =
@@ -58,10 +56,6 @@ module QueryOptions =
     /// Set limit on number of events.
     let limit (count: int) (options: QueryOptions): QueryOptions =
         { options with Limit = Some count }
-
-    /// Enable subscription mode.
-    let subscribe (options: QueryOptions): QueryOptions =
-        { options with Subscribe = true }
 
     /// Set batch size.
     let batchSize (size: int) (options: QueryOptions): QueryOptions =

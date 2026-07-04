@@ -31,15 +31,14 @@ let ``Read throws when cancellation is requested before starting`` () =
     Assert.ThrowsAsync<OperationCanceledException>(work)
 
 [<Fact>]
-let ``Read throws when cancelled during stream`` () =
+let ``Subscribe throws when cancelled during stream`` () =
     use umaClient = connect "localhost" 50002 |> build
     let query: Query = []
-    let options = QueryOptions.defaults |> QueryOptions.subscribe
 
     let work () =
         task {
             use ctsInner = new CancellationTokenSource()
-            let seq = readWithOptions umaClient ctsInner.Token query options
+            let seq = subscribe umaClient ctsInner.Token query QueryOptions.defaults
             do! (TaskSeq.iter (fun _ -> ctsInner.Cancel()) seq |> Async.AwaitTask)
         }
         :> Task
