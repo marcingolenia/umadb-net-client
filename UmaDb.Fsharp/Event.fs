@@ -9,6 +9,7 @@ type UmaEvent =
     { EventType: string
       Data: ReadOnlyMemory<byte>
       Tags: string list option
+      Metadata: (string * string) list option
       Id: Guid option }
 
 /// <summary>Event together with its sequence position in the log (DCB read result).</summary>
@@ -30,6 +31,11 @@ module internal Conversion =
                   None
               else
                   Some(List.ofSeq e.Tags)
+          Metadata =
+              if e.Metadata = null || e.Metadata.Count = 0 then
+                  None
+              else
+                  Some(e.Metadata |> Seq.map (fun m -> m.Key, m.Value) |> List.ofSeq)
           Id =
               if String.IsNullOrEmpty e.Uuid then
                   None
@@ -56,7 +62,12 @@ module internal Conversion =
           Uuid =
               match e.Id with
               | Some id -> id.ToString()
-              | None -> Guid.NewGuid().ToString() }
+              | None -> Guid.NewGuid().ToString()
+          Metadata =
+              match e.Metadata with
+              | Some metadata -> ResizeArray(metadata |> List.map (fun (k, v) -> { Key = k; Value = v }))
+              | None -> ResizeArray()
+        }
 
     let private eventsToList (events: ResizeArray<SequencedEvent>): SequencedUmaEvent list =
         if events = null || events.Count = 0 then

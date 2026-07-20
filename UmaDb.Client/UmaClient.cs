@@ -15,6 +15,7 @@ public sealed class UmaClient(UmaConnection.UmaConnectionResult connection) : ID
 {
     private static readonly List<SequencedUmaEvent> EmptyReadBatchEvents = [];
     private static readonly List<string> EmptyTags = [];
+    private static readonly List<MetadataEntry> EmptyMetadata = [];
 
     private readonly UmaConnection.UmaConnectionResult _connection =
         connection ?? throw new ArgumentNullException(nameof(connection));
@@ -202,6 +203,26 @@ public sealed class UmaClient(UmaConnection.UmaConnectionResult connection) : ID
         return [.. tags!];
     }
 
+    /// <summary>Returns a list suitable for proto Event.Metadata: reuses List when possible to avoid copy.</summary>
+    private static List<MetadataEntry> MetadataForProto(IReadOnlyList<KeyValuePair<string, string>>? metadata)
+    {
+        if (metadata == null || metadata.Count == 0)
+            return EmptyMetadata;
+
+        var list = new List<MetadataEntry>(metadata.Count);
+        foreach (var kvp in metadata)
+            list.Add(new MetadataEntry { Key = kvp.Key, Value = kvp.Value });
+        return list;
+    }
+
+    private static List<KeyValuePair<string, string>> MetadataFromProto(List<MetadataEntry> metadata)
+    {
+        var list = new List<KeyValuePair<string, string>>(metadata.Count);
+        foreach (var entry in metadata)
+            list.Add(new KeyValuePair<string, string>(entry.Key, entry.Value));
+        return list;
+    }
+
     private async IAsyncEnumerable<UmaReadBatch> ReadBatchesAsync(
         UmaQueryWithOptions queryWithOptions,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
@@ -262,6 +283,7 @@ public sealed class UmaClient(UmaConnection.UmaConnectionResult connection) : ID
                     ev.EventType,
                     DataOrEmpty(ev.Data),
                     ev.Tags?.Count > 0 ? ev.Tags : null,
+                    ev.Metadata?.Count > 0 ? MetadataFromProto(ev.Metadata) : null,
                     string.IsNullOrEmpty(ev.Uuid) ? null :
                         Guid.TryParse(ev.Uuid, out var guid) ? guid : (Guid?)null));
         }
@@ -306,6 +328,7 @@ public sealed class UmaClient(UmaConnection.UmaConnectionResult connection) : ID
                 {
                     EventType = e.EventType,
                     Tags = TagsForProto(e.Tags),
+                    Metadata = MetadataForProto(e.Metadata),
                     Data = e.Data.IsEmpty ? Array.Empty<byte>() : e.Data.ToArray(),
                     Uuid = (e.Id ?? Guid.NewGuid()).ToString()
                 });

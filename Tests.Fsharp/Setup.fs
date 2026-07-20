@@ -7,7 +7,7 @@ open Xunit
 
 type Setup() =
     do
-      ContainerBuilder("ghcr.io/umadb-io/umadb:0.5.8")
+      ContainerBuilder("ghcr.io/umadb-io/umadb:0.6.5")
         .WithName("umadb-fsharp")
         .WithPortBinding(50002, 50051)
         .WithReuse(true)
@@ -17,7 +17,7 @@ type Setup() =
         .GetResult()
        
         
-      ContainerBuilder("ghcr.io/umadb-io/umadb:0.5.8")
+      ContainerBuilder("ghcr.io/umadb-io/umadb:0.6.5")
         .WithName("umadb-tls-secure-fsharp")
         .WithPortBinding(50003, 50051)
         .WithResourceMapping(new FileInfo("certs/server.pem"), "/etc/secrets/")

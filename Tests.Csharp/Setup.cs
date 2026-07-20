@@ -29,7 +29,7 @@ namespace Tests.Csharp
         {
             var logger = CreateLogger();
 
-            new ContainerBuilder("ghcr.io/umadb-io/umadb:0.5.8")
+            new ContainerBuilder("ghcr.io/umadb-io/umadb:0.6.5")
                 .WithName("umadb")
                 .WithPortBinding(50051, 50051)
                 .WithLogger(logger)
@@ -37,7 +37,7 @@ namespace Tests.Csharp
                 .Build()
                 .StartAsync().GetAwaiter().GetResult();
 
-            new ContainerBuilder("ghcr.io/umadb-io/umadb:0.5.8")
+            new ContainerBuilder("ghcr.io/umadb-io/umadb:0.6.5")
                 .WithName("umadb-tls-secure")
                 .WithLogger(logger)
                 .WithPortBinding(50001, 50051)

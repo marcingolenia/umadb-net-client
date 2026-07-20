@@ -53,6 +53,7 @@ let ``When events were appended then reading with correct types and tags retriev
         let expectedEvent = { EventType = Guid.NewGuid().ToString()
                               Data = ReadOnlyMemory(Encoding.UTF8.GetBytes "test")
                               Tags = Some tags
+                              Metadata = None
                               Id = None }
         let uma = connect "localhost" 50002 |> build
         let events: UmaEvent list = [ expectedEvent ]
@@ -82,6 +83,7 @@ let ``When events are appended and failCondition fails then IntegrationError is 
         let tags = ["tag1"; "tag2"]
         let expectedEvent = { EventType = Guid.NewGuid().ToString()
                               Data = ReadOnlyMemory(Encoding.UTF8.GetBytes "test")
+                              Metadata = None
                               Tags = Some tags
                               Id = None }
         let query = [{Tags = tags; Types = [expectedEvent.EventType]}]
@@ -117,10 +119,12 @@ let ``idempotent append with same id returns same commit position`` () =
         let evt1 = { EventType = evtType
                      Data = ReadOnlyMemory(Encoding.UTF8.GetBytes "test")
                      Tags = Some tags
+                     Metadata = None
                      Id = Some id }
         let evt2 = { EventType = evtType
                      Data = ReadOnlyMemory(Encoding.UTF8.GetBytes "test")
                      Tags = Some tags
+                     Metadata = None
                      Id = Some id }
         // Act
         let! appendResponse1 = append uma CancellationToken.None (appendOperation [evt1] |> failIfMatch query |> withAfter after)
@@ -147,6 +151,7 @@ let ``append returns commit position`` () =
         let evt = { EventType = "OrderCreated"
                     Data = ReadOnlyMemory Array.empty
                     Tags = Some [tag]
+                    Metadata = None
                     Id = None }
         let! response = appendOperation [evt] |> append uma CancellationToken.None
         match response with
@@ -160,9 +165,9 @@ let ``can read backwards`` () =
         use uma = connect "localhost" 50002 |> build
         let tag = $"back-{Guid.NewGuid()}"
         let events =
-            [ { EventType = "A"; Data = ReadOnlyMemory [|1uy|]; Tags = Some [tag]; Id = None }
-              { EventType = "B"; Data = ReadOnlyMemory [|2uy|]; Tags = Some [tag]; Id = None }
-              { EventType = "C"; Data = ReadOnlyMemory [|3uy|]; Tags = Some [tag]; Id = None } ]
+            [ { EventType = "A"; Data = ReadOnlyMemory [|1uy|]; Tags = Some [tag]; Id = None; Metadata = None }
+              { EventType = "B"; Data = ReadOnlyMemory [|2uy|]; Tags = Some [tag]; Id = None; Metadata = None }
+              { EventType = "C"; Data = ReadOnlyMemory [|3uy|]; Tags = Some [tag]; Id = None; Metadata = None } ]
         let! _ = appendOperation events |> append uma CancellationToken.None
         let query = [{ Tags = [tag]; Types = ["A"; "B"; "C"] }]
         let options = QueryOptions.defaults |> QueryOptions.backwards |> QueryOptions.limit 2
@@ -183,6 +188,7 @@ let ``consistency boundary read then append with condition after head`` () =
         let query: Query = [{ Tags = [tag]; Types = [evtType] }]
         let evt1 = { EventType = evtType
                      Data = ReadOnlyMemory(Encoding.UTF8.GetBytes """{"OrderId":"00000000-0000-0000-0000-000000000001","Amount":1}""")
+                     Metadata = None
                      Tags = Some [tag]
                      Id = None }
         let! _ = appendOperation [evt1] |> failIfMatch query |> append uma CancellationToken.None
@@ -192,9 +198,32 @@ let ``consistency boundary read then append with condition after head`` () =
         let evt2 = { EventType = evtType
                      Data = ReadOnlyMemory(Encoding.UTF8.GetBytes """{"OrderId":"00000000-0000-0000-0000-000000000002","Amount":2}""")
                      Tags = Some [tag]
+                     Metadata = None
                      Id = None }
         let! _ = appendOperation [evt2] |> failIfMatch query |> withAfter after |> append uma CancellationToken.None
         let! events, _ = readList uma query
         events.Length |> should equal 2
     }
 
+[<Fact>]
+let ``metadata can be read including duplicates`` () =
+    task {
+        use uma = connect "localhost" 50002 |> build
+        let tag = $"back-{Guid.NewGuid()}"
+        let metadata = [("CorrelationId", "1"); ("CorrelationId", "2"); ("X","Z")]
+        let events =
+            [ { EventType = "A"; Data = ReadOnlyMemory [|1uy|]; Tags = Some [tag]; Id = None; Metadata = None }
+              { EventType = "C"
+                Data = ReadOnlyMemory [|3uy|]
+                Tags = Some [tag]
+                Id = None
+                Metadata = Some metadata
+              }
+            ]
+        let! _ = appendOperation events |> append uma CancellationToken.None
+        let query = [{ Tags = [tag]; Types = ["A"; "B"; "C"] }]
+        let! events, _ = readList uma query
+        events.Length |> should equal 2
+        events[0].Event.Metadata |> should equal None
+        events[1].Event.Metadata |> should equal (Some metadata)
+    }

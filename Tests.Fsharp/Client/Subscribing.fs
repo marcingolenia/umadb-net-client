@@ -31,6 +31,7 @@ let ``can subscribe to events using subscribeWithCallback`` () =
             { EventType = "OrderCreated"
               Data = ReadOnlyMemory(JsonSerializer.SerializeToUtf8Bytes orderCreated )
               Tags = Some [ tag ]
+              Metadata = None
               Id = None }
 
         let received = TaskCompletionSource<SequencedUmaEvent>()
@@ -61,6 +62,7 @@ let ``can subscribe using subscribe`` () =
         let eventToAppend =
             { EventType = "OrderCreated"
               Data = ReadOnlyMemory(JsonSerializer.SerializeToUtf8Bytes(orderCreated))
+              Metadata = None
               Tags = Some [ tag ]
               Id = None }
 

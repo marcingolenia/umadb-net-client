@@ -15,6 +15,7 @@ let ``Can connect and append event using raw GrpcChannel`` () =
         let client = channel.CreateGrpcService<IDcbService>()
         let event = {
             EventType = "TestEvent"
+            Metadata = ResizeArray()
             Tags = ResizeArray(["test"; "debug"])
             Data = System.Text.Encoding.UTF8.GetBytes("Hello UmaDB")
             Uuid = Guid.NewGuid().ToString()

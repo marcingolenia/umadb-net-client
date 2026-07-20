@@ -29,6 +29,14 @@ A high-performance .NET client for [UmaDB](https://umadb.io/), designed for Dyna
   - **Performance on hot paths:** UmaDB clients are used in high-throughput consumers and projections. Every conversion between `Task`/`IAsyncEnumerable` and `Async<'T>` / `AsyncSeq` adds state machines, allocations, and potential context switches. Keeping the public surface on `task` / `taskSeq` minimizes overhead in the streaming path.
   - **F# ergonomics preserved:** F# developers can still opt into `Async<'T>` at their own boundaries (e.g. `Task` → `Async<'T>` via `Async.AwaitTask`, or materializing `taskSeq` to a list), but the core library remains “close to the wire” and does not force that model internally.
 
+### ADR 4: Event metadata is an ordered list of key-value pairs, not a map
+
+* **Decision:** `Event.metadata` is represented as an ordered collection of key-value entries across all surfaces — `ResizeArray<MetadataEntry>` in `UmaDb.Core`, `(string * string) list option` in the F# client, and `List<KeyValuePair<string, string>>` in the C# client — not a `Dictionary`/`Map`.
+* **Rationale:**
+  - On the wire, `metadata` is `repeated MetadataEntry`, not a proto3 `map<string, string>`. Server-side it's backed by `Vec<(String, String)>`, and neither the proto conversion nor the append/read path in UmaDB dedupes or enforces unique keys — duplicate keys are technically valid, similar to HTTP or email headers.
+  - The store is shared: events read by this client may have been written by other producers (other language clients, or callers bypassing convenience helpers) that don't guarantee uniqueness. A client-side `Dictionary`/`Map` would silently drop entries for any such event, and would not preserve wire order (F# `Map` is key-sorted, not insertion-ordered).
+  - Uniqueness is a convention, not a guarantee, so the client must not assume it or enforce it by construction. Callers who want map-like ergonomics when constructing new events can convert at the call site (e.g. `Map.toList`, `.ToDictionary()`) without weakening the type everyone else relies on for faithful reads.
+
 ---
 
 ## Managing UmaClient

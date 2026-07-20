@@ -4,11 +4,17 @@ open System
 open ProtoBuf
 
 [<ProtoContract; CLIMutable>]
+type MetadataEntry =
+    { [<ProtoMember(1)>] Key: string
+      [<ProtoMember(2)>] Value: string }
+
+[<ProtoContract; CLIMutable>]
 type Event =
     { [<ProtoMember(1)>] EventType: string
       [<ProtoMember(2)>] Tags: ResizeArray<string>
       [<ProtoMember(3)>] Data: byte[]
-      [<ProtoMember(4)>] Uuid: string }
+      [<ProtoMember(4)>] Uuid: string
+      [<ProtoMember(5)>] Metadata: ResizeArray<MetadataEntry> }
 
 [<ProtoContract; CLIMutable>]
 type SequencedEvent =

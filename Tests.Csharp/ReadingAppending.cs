@@ -63,7 +63,7 @@ public class ReadingAppending
         var tag = $"idem-{Guid.NewGuid()}";
         var query = UmaQuery.Where([nameof(OrderCreated)], [tag]);
         var id = Guid.NewGuid();
-        var evt = new UmaEvent(nameof(OrderCreated), new ReadOnlyMemory<byte>([1, 2, 3]), [tag], id);
+        var evt = new UmaEvent(nameof(OrderCreated), new ReadOnlyMemory<byte>([1, 2, 3]), [tag], null, id);
         var r1 = await umaClient.AppendAsync([evt], failIfMatch: query, ct: TestContext.Current.CancellationToken);
         var r2 = await umaClient.AppendAsync([evt], failIfMatch: query, ct: TestContext.Current.CancellationToken);
         Assert.Equal(r1.Position, r2.Position);
@@ -95,7 +95,7 @@ public class ReadingAppending
         var evt1 = new UmaEvent(nameof(OrderCreated), JsonSerializer.SerializeToUtf8Bytes(new OrderCreated(Guid.NewGuid(), 1m)), [tag]);
         await umaClient.AppendAsync([evt1], failIfMatch: query, after: null, ct: TestContext.Current.CancellationToken);
         await foreach (var _ in umaClient.ReadAsync(query.WithOptions(o => { }), TestContext.Current.CancellationToken))
-            { }
+        { }
         var after = await umaClient.GetHeadAsync(TestContext.Current.CancellationToken);
         var evt2 = new UmaEvent(nameof(OrderCreated), JsonSerializer.SerializeToUtf8Bytes(new OrderCreated(Guid.NewGuid(), 2m)), [tag]);
         await umaClient.AppendAsync([evt2], failIfMatch: query, after: after, ct: TestContext.Current.CancellationToken);
@@ -124,6 +124,29 @@ public class ReadingAppending
         var exception = await Assert.ThrowsAsync<UmaDbException.IntegrityException>(
             () => umaClient.AppendAsync(events: [umaEvt2], failIfMatch: query, ct: TestContext.Current.CancellationToken).AsTask());
         
-        Assert.IsAssignableFrom<UmaDbException>(exception);
+        Assert.IsType<UmaDbException>(exception, exactMatch: false);
+    }
+
+    [Fact]
+    public async Task metadata_can_be_read_including_duplicates()
+    {
+        using var umaClient = UmaClient.Connect(new UmaClientOptions().WithHost("localhost").WithPort(50051));
+        var tag = $"back-{Guid.NewGuid()}";
+        var metadata = new List<KeyValuePair<string, string>>
+        {
+            new("CorrelationId", "1"),
+            new("CorrelationId", "2"),
+            new("X", "Z"),
+        };
+        var evt1 = new UmaEvent("A", new ReadOnlyMemory<byte>([1]), [tag]);
+        var evt2 = new UmaEvent("C", new ReadOnlyMemory<byte>([3]), [tag], metadata);
+        await umaClient.AppendAsync([evt1, evt2], ct: TestContext.Current.CancellationToken);
+
+        var query = UmaQuery.Where(["A", "B", "C"], [tag]);
+        var (events, _) = await umaClient.ReadListAsync(query, TestContext.Current.CancellationToken);
+
+        Assert.Equal(2, events.Count);
+        Assert.Null(events[0].Event.Metadata);
+        Assert.Equal(metadata, events[1].Event.Metadata);
     }
 }

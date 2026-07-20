@@ -4,7 +4,7 @@
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
         <NoWarn>$(NoWarn);1591</NoWarn>
         <PackageId>UmaDb.Client.Fsharp</PackageId>
-        <Version>0.5.8</Version>
+        <Version>0.6.5</Version>
         <Title>UmaDb .NET Client (F#)</Title>
         <Authors>UmaDb .NET Client Contributors</Authors>
         <Company>UmaDb</Company>
