@@ -206,20 +206,14 @@ let ``consistency boundary read then append with condition after head`` () =
     }
 
 [<Fact>]
-let ``metadata can be read including duplicates`` () =
+let ``metadata roundtrips`` () =
     task {
         use uma = connect "localhost" 50002 |> build
-        let tag = $"back-{Guid.NewGuid()}"
-        let metadata = [("CorrelationId", "1"); ("CorrelationId", "2"); ("X","Z")]
+        let tag = $"meta-{Guid.NewGuid()}"
+        let metadata = Map [("CorrelationId", "abc-123"); ("Source", "checkout-api")]
         let events =
             [ { EventType = "A"; Data = ReadOnlyMemory [|1uy|]; Tags = Some [tag]; Id = None; Metadata = None }
-              { EventType = "C"
-                Data = ReadOnlyMemory [|3uy|]
-                Tags = Some [tag]
-                Id = None
-                Metadata = Some metadata
-              }
-            ]
+              { EventType = "C"; Data = ReadOnlyMemory [|3uy|]; Tags = Some [tag]; Id = None; Metadata = Some metadata } ]
         let! _ = appendOperation events |> append uma CancellationToken.None
         let query = [{ Tags = [tag]; Types = ["A"; "B"; "C"] }]
         let! events, _ = readList uma query

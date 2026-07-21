@@ -128,15 +128,14 @@ public class ReadingAppending
     }
 
     [Fact]
-    public async Task metadata_can_be_read_including_duplicates()
+    public async Task metadata_roundtrips()
     {
         using var umaClient = UmaClient.Connect(new UmaClientOptions().WithHost("localhost").WithPort(50051));
-        var tag = $"back-{Guid.NewGuid()}";
-        var metadata = new List<KeyValuePair<string, string>>
+        var tag = $"meta-{Guid.NewGuid()}";
+        var metadata = new Dictionary<string, string>
         {
-            new("CorrelationId", "1"),
-            new("CorrelationId", "2"),
-            new("X", "Z"),
+            ["CorrelationId"] = "abc-123",
+            ["Source"] = "checkout-api",
         };
         var evt1 = new UmaEvent("A", new ReadOnlyMemory<byte>([1]), [tag]);
         var evt2 = new UmaEvent("C", new ReadOnlyMemory<byte>([3]), [tag], metadata);
@@ -147,6 +146,10 @@ public class ReadingAppending
 
         Assert.Equal(2, events.Count);
         Assert.Null(events[0].Event.Metadata);
-        Assert.Equal(metadata, events[1].Event.Metadata);
+        var meta = events[1].Event.Metadata;
+        Assert.NotNull(meta);
+        Assert.Equal(2, meta.Count);
+        Assert.Equal("abc-123", meta["CorrelationId"]);
+        Assert.Equal("checkout-api", meta["Source"]);
     }
 }

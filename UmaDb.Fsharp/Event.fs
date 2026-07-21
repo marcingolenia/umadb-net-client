@@ -9,7 +9,7 @@ type UmaEvent =
     { EventType: string
       Data: ReadOnlyMemory<byte>
       Tags: string list option
-      Metadata: (string * string) list option
+      Metadata: Map<string, string> option
       Id: Guid option }
 
 /// <summary>Event together with its sequence position in the log (DCB read result).</summary>
@@ -35,7 +35,8 @@ module internal Conversion =
               if e.Metadata = null || e.Metadata.Count = 0 then
                   None
               else
-                  Some(e.Metadata |> Seq.map (fun m -> m.Key, m.Value) |> List.ofSeq)
+                  // Map.ofSeq is last-wins, so any stray duplicate keys from legacy events don't throw.
+                  Some(e.Metadata |> Seq.map (fun m -> m.Key, m.Value) |> Map.ofSeq)
           Id =
               if String.IsNullOrEmpty e.Uuid then
                   None
@@ -65,7 +66,8 @@ module internal Conversion =
               | None -> Guid.NewGuid().ToString()
           Metadata =
               match e.Metadata with
-              | Some metadata -> ResizeArray(metadata |> List.map (fun (k, v) -> { Key = k; Value = v }))
+              | Some metadata ->
+                  ResizeArray(metadata |> Map.toSeq |> Seq.map (fun (k, v) -> { Key = k; Value = v }))
               | None -> ResizeArray()
         }
 

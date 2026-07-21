@@ -203,8 +203,8 @@ public sealed class UmaClient(UmaConnection.UmaConnectionResult connection) : ID
         return [.. tags!];
     }
 
-    /// <summary>Returns a list suitable for proto Event.Metadata: reuses List when possible to avoid copy.</summary>
-    private static List<MetadataEntry> MetadataForProto(IReadOnlyList<KeyValuePair<string, string>>? metadata)
+    /// <summary>Returns a list suitable for proto Event.Metadata.</summary>
+    private static List<MetadataEntry> MetadataForProto(IReadOnlyDictionary<string, string>? metadata)
     {
         if (metadata == null || metadata.Count == 0)
             return EmptyMetadata;
@@ -215,12 +215,12 @@ public sealed class UmaClient(UmaConnection.UmaConnectionResult connection) : ID
         return list;
     }
 
-    private static List<KeyValuePair<string, string>> MetadataFromProto(List<MetadataEntry> metadata)
+    private static Dictionary<string, string> MetadataFromProto(List<MetadataEntry> metadata)
     {
-        var list = new List<KeyValuePair<string, string>>(metadata.Count);
+        var dict = new Dictionary<string, string>(metadata.Count);
         foreach (var entry in metadata)
-            list.Add(new KeyValuePair<string, string>(entry.Key, entry.Value));
-        return list;
+            dict[entry.Key] = entry.Value; // indexer is last-wins, so legacy duplicate keys don't throw
+        return dict;
     }
 
     private async IAsyncEnumerable<UmaReadBatch> ReadBatchesAsync(

@@ -29,13 +29,14 @@ A high-performance .NET client for [UmaDB](https://umadb.io/), designed for Dyna
   - **Performance on hot paths:** UmaDB clients are used in high-throughput consumers and projections. Every conversion between `Task`/`IAsyncEnumerable` and `Async<'T>` / `AsyncSeq` adds state machines, allocations, and potential context switches. Keeping the public surface on `task` / `taskSeq` minimizes overhead in the streaming path.
   - **F# ergonomics preserved:** F# developers can still opt into `Async<'T>` at their own boundaries (e.g. `Task` → `Async<'T>` via `Async.AwaitTask`, or materializing `taskSeq` to a list), but the core library remains “close to the wire” and does not force that model internally.
 
-### ADR 4: Event metadata is an ordered list of key-value pairs, not a map
+### ADR 4: Event metadata is exposed as a keyed map (client), backed by a repeated wire type
 
-* **Decision:** `Event.metadata` is represented as an ordered collection of key-value entries across all surfaces — `ResizeArray<MetadataEntry>` in `UmaDb.Core`, `(string * string) list option` in the F# client, and `List<KeyValuePair<string, string>>` in the C# client — not a `Dictionary`/`Map`.
+* **Decision:** `Event.metadata` is exposed to users as a keyed map — `Map<string, string> option` in the F# client and `IReadOnlyDictionary<string, string>` in the C# client — while the wire/Core representation stays a `repeated MetadataEntry` list (`ResizeArray<MetadataEntry>` in `UmaDb.Core`).
+* **Context:** An earlier revision of this client used an ordered list of pairs because the server did not enforce key uniqueness, so a map would have silently dropped duplicate keys on read. As of UmaDB 0.6.6 the server **rejects duplicate metadata keys on append**, so keys are now guaranteed unique in stored events.
 * **Rationale:**
-  - On the wire, `metadata` is `repeated MetadataEntry`, not a proto3 `map<string, string>`. Server-side it's backed by `Vec<(String, String)>`, and neither the proto conversion nor the append/read path in UmaDB dedupes or enforces unique keys — duplicate keys are technically valid, similar to HTTP or email headers.
-  - The store is shared: events read by this client may have been written by other producers (other language clients, or callers bypassing convenience helpers) that don't guarantee uniqueness. A client-side `Dictionary`/`Map` would silently drop entries for any such event, and would not preserve wire order (F# `Map` is key-sorted, not insertion-ordered).
-  - Uniqueness is a convention, not a guarantee, so the client must not assume it or enforce it by construction. Callers who want map-like ergonomics when constructing new events can convert at the call site (e.g. `Map.toList`, `.ToDictionary()`) without weakening the type everyone else relies on for faithful reads.
+  - With uniqueness guaranteed server-side, a keyed map is the natural, most ergonomic representation for keyed lookup data (correlation id, source, etc.) and mirrors the Python client's `dict[str, str]`.
+  - The wire type stays `repeated MetadataEntry` (not proto3 `map`) for compatibility; the client converts to/from the map at the edge. Conversion on read is last-wins (`Map.ofSeq` / dictionary indexer) so any legacy event written before the uniqueness check does not throw.
+  - Entry order is **not** preserved by these types (F# `Map` is key-sorted; `Dictionary` is unordered). This is acceptable because metadata is keyed lookup data — consumers read by key and do not depend on entry order.
 
 ---
 
