@@ -270,7 +270,7 @@ Fluent options for `Connect`. **WithHost**(`string`), **WithPort**(`int`), **Wit
 ### Core types
 
 - **UmaEvent**(`EventType`, `Data` (bytes), `Tags?`, `Id?`) — event to append or read.
-- **SequencedUmaEvent**(`Position`, `Event`) — read result (each item from `ReadAsync`).
+- **SequencedUmaEvent**(`Position`, `Event`, `TrackingInfo?`) — read result (each item from `ReadAsync`); `TrackingInfo` is set when the event was appended with tracking info.
 - **UmaTrackingInfo**(`Source`, `Position`) — upstream checkpoint.
 - **AppendResponse** — `Position` (commit position).
 

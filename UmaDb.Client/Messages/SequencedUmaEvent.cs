@@ -5,7 +5,9 @@ namespace UmaDb.Client.Messages;
 /// </summary>
 /// <param name="Position">Sequence number assigned by the server when the event was appended.</param>
 /// <param name="Event">The event payload, type, tags, and metadata.</param>
+/// <param name="TrackingInfo">Upstream tracking info given when the event was appended, if any.</param>
 public record SequencedUmaEvent(
     long Position,
-    UmaEvent Event
+    UmaEvent Event,
+    UmaTrackingInfo? TrackingInfo = null
 );

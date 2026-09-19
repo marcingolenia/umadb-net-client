@@ -221,3 +221,19 @@ let ``metadata roundtrips`` () =
         events[0].Event.Metadata |> should equal None
         events[1].Event.Metadata |> should equal (Some metadata)
     }
+
+[<Fact>]
+let ``tracking info given on append roundtrips on the sequenced event`` () =
+    task {
+        use uma = connect "localhost" 50002 |> build
+        let tag = $"tracking-{Guid.NewGuid()}"
+        let source = $"source-{Guid.NewGuid()}"
+        let! existing = readTrackingInfo uma CancellationToken.None source
+        let position = (existing |> Option.defaultValue 0L) + 1L
+        let evt = { EventType = "A"; Data = ReadOnlyMemory [|1uy|]; Tags = Some [tag]; Id = None; Metadata = None }
+        let! _ = appendOperation [evt] |> track source position |> append uma CancellationToken.None
+        let query = [{ Tags = [tag]; Types = ["A"] }]
+        let! events, _ = readList uma query
+        events.Length |> should equal 1
+        events[0].TrackingInfo |> should equal (Some { Source = source; Position = position })
+    }

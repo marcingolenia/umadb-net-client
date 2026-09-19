@@ -32,7 +32,7 @@ A high-performance .NET client for [UmaDB](https://umadb.io/), designed for Dyna
 ### ADR 4: Event metadata is exposed as a keyed map (client), backed by a repeated wire type
 
 * **Decision:** `Event.metadata` is exposed to users as a keyed map — `Map<string, string> option` in the F# client and `IReadOnlyDictionary<string, string>` in the C# client — while the wire/Core representation stays a `repeated MetadataEntry` list (`ResizeArray<MetadataEntry>` in `UmaDb.Core`).
-* **Context:** An earlier revision of this client used an ordered list of pairs because the server did not enforce key uniqueness, so a map would have silently dropped duplicate keys on read. As of UmaDB 0.6.6 the server **rejects duplicate metadata keys on append**, so keys are now guaranteed unique in stored events.
+* **Context:** An earlier revision of this client used an ordered list of pairs because the server did not enforce key uniqueness, so a map would have silently dropped duplicate keys on read. As of UmaDB 0.7.8 the server **rejects duplicate metadata keys on append**, so keys are now guaranteed unique in stored events.
 * **Rationale:**
   - With uniqueness guaranteed server-side, a keyed map is the natural, most ergonomic representation for keyed lookup data (correlation id, source, etc.) and mirrors the Python client's `dict[str, str]`.
   - The wire type stays `repeated MetadataEntry` (not proto3 `map`) for compatibility; the client converts to/from the map at the edge. Conversion on read is last-wins (`Map.ofSeq` / dictionary indexer) so any legacy event written before the uniqueness check does not throw.

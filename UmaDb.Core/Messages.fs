@@ -17,9 +17,15 @@ type Event =
       [<ProtoMember(5)>] Metadata: ResizeArray<MetadataEntry> }
 
 [<ProtoContract; CLIMutable>]
+type TrackingInfo =
+    { [<ProtoMember(1)>] Source: string
+      [<ProtoMember(2)>] Position: uint64 }
+
+[<ProtoContract; CLIMutable>]
 type SequencedEvent =
     { [<ProtoMember(1)>] Position: uint64
-      [<ProtoMember(2)>] Event: Event }
+      [<ProtoMember(2)>] Event: Event
+      [<ProtoMember(3)>] TrackingInfo: TrackingInfo }
 
 [<ProtoContract; CLIMutable>]
 type QueryItem =
@@ -57,11 +63,6 @@ type SubscribeRequest =
 [<ProtoContract; CLIMutable>]
 type SubscribeResponse =
     { [<ProtoMember(1)>] Events: ResizeArray<SequencedEvent> }
-
-[<ProtoContract; CLIMutable>]
-type TrackingInfo =
-    { [<ProtoMember(1)>] Source: string
-      [<ProtoMember(2)>] Position: uint64 }
 
 [<ProtoContract; CLIMutable>]
 type AppendRequest =

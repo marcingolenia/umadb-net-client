@@ -285,7 +285,10 @@ public sealed class UmaClient(UmaConnection.UmaConnectionResult connection) : ID
                     ev.Tags?.Count > 0 ? ev.Tags : null,
                     ev.Metadata?.Count > 0 ? MetadataFromProto(ev.Metadata) : null,
                     string.IsNullOrEmpty(ev.Uuid) ? null :
-                        Guid.TryParse(ev.Uuid, out var guid) ? guid : (Guid?)null));
+                        Guid.TryParse(ev.Uuid, out var guid) ? guid : (Guid?)null),
+                e.TrackingInfo != null
+                    ? new UmaTrackingInfo(e.TrackingInfo.Source, (long)e.TrackingInfo.Position)
+                    : null);
         }
 
         return events;

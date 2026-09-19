@@ -273,7 +273,7 @@ let! posResult2 = append client ct op
 ### Event (UmaDb.Client.Event)
 
 - **UmaEvent** — `EventType`, `Data` (ReadOnlyMemory&lt;byte&gt;), `Tags` (string list option), `Id` (Guid option).
-- **SequencedUmaEvent** — `Position: int64`, `Event: UmaEvent`.
+- **SequencedUmaEvent** — `Position: int64`, `Event: UmaEvent`, `TrackingInfo: UmaTrackingInfo option` (set when the event was appended with tracking info).
 - **UmaTrackingInfo** — `Source: string`, `Position: int64`.
 
 ### Query (UmaDb.Client.Query)

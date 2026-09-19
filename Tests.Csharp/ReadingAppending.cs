@@ -152,4 +152,23 @@ public class ReadingAppending
         Assert.Equal("abc-123", meta["CorrelationId"]);
         Assert.Equal("checkout-api", meta["Source"]);
     }
+
+    [Fact]
+    public async Task tracking_info_given_on_append_roundtrips_on_the_sequenced_event()
+    {
+        using var umaClient = UmaClient.Connect(new UmaClientOptions().WithHost("localhost").WithPort(50051));
+        var tag = $"tracking-{Guid.NewGuid()}";
+        var source = $"source-{Guid.NewGuid()}";
+        var existing = await umaClient.GetTrackingInfoAsync(source, TestContext.Current.CancellationToken);
+        var position = (existing ?? 0) + 1;
+        var evt = new UmaEvent("A", new ReadOnlyMemory<byte>([1]), [tag]);
+        var trackingInfo = new UmaTrackingInfo(source, position);
+        await umaClient.AppendAsync([evt], trackingInfo: trackingInfo, ct: TestContext.Current.CancellationToken);
+
+        var query = UmaQuery.Where(["A"], [tag]);
+        var (events, _) = await umaClient.ReadListAsync(query, TestContext.Current.CancellationToken);
+
+        Assert.Single(events);
+        Assert.Equal(trackingInfo, events[0].TrackingInfo);
+    }
 }

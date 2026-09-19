@@ -12,15 +12,16 @@ type UmaEvent =
       Metadata: Map<string, string> option
       Id: Guid option }
 
-/// <summary>Event together with its sequence position in the log (DCB read result).</summary>
-type SequencedUmaEvent =
-    { Position: int64
-      Event: UmaEvent }
-
 /// <summary>Upstream source and position for exactly-once ingestion (stored atomically with appended events).</summary>
 type UmaTrackingInfo =
     { Source: string
       Position: int64 }
+
+/// <summary>Event together with its sequence position in the log (DCB read result).</summary>
+type SequencedUmaEvent =
+    { Position: int64
+      Event: UmaEvent
+      TrackingInfo: UmaTrackingInfo option }
 
 module internal Conversion =
     let toUmaEvent (e: Event): UmaEvent =
@@ -47,7 +48,12 @@ module internal Conversion =
 
     let toSequencedUmaEvent (e: SequencedEvent): SequencedUmaEvent =
         { Position = int64 e.Position
-          Event = toUmaEvent e.Event }
+          Event = toUmaEvent e.Event
+          TrackingInfo =
+              if box e.TrackingInfo = null then
+                  None
+              else
+                  Some { Source = e.TrackingInfo.Source; Position = int64 e.TrackingInfo.Position } }
 
     let fromUmaEvent (e: UmaEvent): Event =
         { EventType = e.EventType
