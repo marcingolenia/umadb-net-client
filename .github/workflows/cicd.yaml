@@ -20,18 +20,18 @@ jobs:
       - name: Restore dependencies
         run: dotnet restore
       - name: Build
-        run: dotnet build --no-restore
+        run: dotnet build --no-restore -c Release
       - name: Test
         id: test
         run: >
-          dotnet test
+          dotnet test -c Release --no-build
           --logger "console;verbosity=normal"
           --blame-crash --blame-crash-dump-type mini
           --blame-hang-timeout 90s --blame-hang-dump-type none
       - name: F# test host crash log
         if: always() && steps.test.outcome != 'success'
         run: |
-          f=Tests.Fsharp/bin/Debug/net10.0/unhandled-exceptions.log
+          f=Tests.Fsharp/bin/Release/net10.0/unhandled-exceptions.log
           if [ -f "$f" ]; then tail -n 300 "$f"; else echo "no $f"; fi
       - name: UmaDB container logs
         if: always() && steps.test.outcome != 'success'
