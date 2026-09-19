@@ -22,7 +22,20 @@ jobs:
       - name: Build
         run: dotnet build --no-restore
       - name: Test
-        run: dotnet test
+        id: test
+        run: >
+          dotnet test
+          --logger "console;verbosity=normal"
+          --blame-crash --blame-crash-dump-type mini
+          --blame-hang-timeout 90s --blame-hang-dump-type none
+      - name: UmaDB container logs
+        if: always() && steps.test.outcome != 'success'
+        run: |
+          for c in umadb-fsharp umadb-tls-secure-fsharp umadb umadb-tls-secure; do
+            echo "::group::docker logs $c"
+            docker logs "$c" 2>&1 | tail -n 200 || true
+            echo "::endgroup::"
+          done
       - name: Pack NuGet
         run: |
           dotnet pack UmaDb.Client/UmaDb.Client.csproj -c Release -o nuget
