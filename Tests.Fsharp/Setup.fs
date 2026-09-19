@@ -5,20 +5,26 @@ open System.IO
 open DotNet.Testcontainers.Builders
 open Xunit
 
-/// Writes to the raw stderr stream: [<CaptureConsole>] redirects Console.Error while tests run, which could swallow the output.
-let private logToStderr (message: string) =
-    use stderr = Console.OpenStandardError()
-    let bytes = Text.Encoding.UTF8.GetBytes(message + Environment.NewLine)
-    stderr.Write(bytes, 0, bytes.Length)
-    stderr.Flush()
+/// vstest does not surface the test host's stderr and [<CaptureConsole>] redirects Console, so crash details go to a file
+/// next to the test assembly. The CI workflow prints it.
+let private crashLogPath = IO.Path.Combine(AppContext.BaseDirectory, "unhandled-exceptions.log")
+
+let private logCrash (message: string) =
+    IO.File.AppendAllText(crashLogPath, $"{DateTime.UtcNow:O} {message}{Environment.NewLine}{Environment.NewLine}")
 
 type Setup() =
     do
-      // xunit only reports "[FATAL ERROR] <ExceptionType>" for a crash on a background thread; log the full exception.
-      AppDomain.CurrentDomain.UnhandledException.Add(fun args ->
-          logToStderr $"[UNHANDLED EXCEPTION] terminating={args.IsTerminating}{Environment.NewLine}{args.ExceptionObject}")
+      // xunit only reports "[FATAL ERROR] NullReferenceException" (no stack) and its own UnhandledException handler runs
+      // before any we could register, so log every NullReferenceException at throw time, with the full stack of the throwing thread.
+      AppDomain.CurrentDomain.FirstChanceException.Add(fun args ->
+          match args.Exception with
+          | :? NullReferenceException as ex ->
+              try logCrash $"[NullReferenceException thrown]{Environment.NewLine}{ex}{Environment.NewLine}--- stack of throwing thread ---{Environment.NewLine}{Environment.StackTrace}"
+              with _ -> ()
+          | _ -> ())
+      // Exceptions from fire-and-forget tasks are otherwise swallowed silently.
       System.Threading.Tasks.TaskScheduler.UnobservedTaskException.Add(fun args ->
-          logToStderr $"[UNOBSERVED TASK EXCEPTION]{Environment.NewLine}{args.Exception}")
+          logCrash $"[UNOBSERVED TASK EXCEPTION]{Environment.NewLine}{args.Exception}")
       ContainerBuilder("ghcr.io/umadb-io/umadb:0.7.8")
         .WithName("umadb-fsharp")
         .WithPortBinding(50002, 50051)
