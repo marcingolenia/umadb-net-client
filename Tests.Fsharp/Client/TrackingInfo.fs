@@ -13,7 +13,7 @@ let ``can store tracking info`` () =
     task {
         // Arrange
         use uma = connect "localhost" 50002 |> build
-        let source = "test"
+        let source = $"source-{System.Guid.NewGuid()}"
         let! trackingInfo = readTrackingInfo uma CancellationToken.None source
         let next = (trackingInfo |> Option.defaultValue 0L) + 1L
         // Act
@@ -29,9 +29,10 @@ let ``when storing non increasing tracking info then IntegrityException is throw
     task {
         // Arrange
         use uma = connect "localhost" 50002 |> build
-        let source = "test"
+        let source = $"source-{System.Guid.NewGuid()}"
+        let! _ = append uma CancellationToken.None (appendOperation [] |> track source 1L)
         let! trackingInfo = readTrackingInfo uma CancellationToken.None source
-        let sameNext = (trackingInfo |> Option.defaultValue 0L) 
+        let sameNext = trackingInfo.Value
         // Act
         let! appendResponse = append uma CancellationToken.None (appendOperation [] |> track source sameNext)
         // Assert
